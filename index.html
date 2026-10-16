@@ -20,8 +20,17 @@
 const matches=[['Deportivo','Levante'],['Espanyol','Atlético'],['Villarreal','Elche'],['Betis','Barcelona'],['Valencia','Athletic'],['Osasuna','Racing'],['Celta','Alavés'],['Málaga','Real Sociedad'],['Real Madrid','Sevilla'],['Getafe','Rayo']];
 let rows=null,catalog=null;const $=id=>document.getElementById(id);
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
-function parseDate(s){s=String(s||'');if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):null}
-window.RadarBrowserEngine={date:parseDate,norm:s=>({'atletico':'at madrid','athletic':'ath bilbao','real sociedad':'sociedad','alaves':'alaves','malaga':'malaga'}[norm(s)]||norm(s))};
+function parseDate(s){
+ s=String(s??'').trim();
+ // Fecha ISO con hora opcional; la hora no interviene en el selector FT.
+ let m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/);
+ if(!m){m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/);if(!m)return null;m=[null,m[3],m[2].padStart(2,'0'),m[1].padStart(2,'0')];}
+ const y=Number(m[1]),mo=Number(m[2]),d=Number(m[3]);
+ const dt=new Date(Date.UTC(y,mo-1,d));
+ if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==mo-1||dt.getUTCDate()!==d)return null;
+ return m[1]+'-'+m[2]+'-'+m[3];
+}
+window.RadarBrowserEngine={date:parseDate,norm:s=>({'atletico':'ath madrid','at madrid':'ath madrid','ath madrid':'ath madrid','espanyol':'espanol','athletic':'ath bilbao','real sociedad':'sociedad','alaves':'alaves','malaga':'malaga'}[norm(s)]||norm(s))};
 $('history').addEventListener('change',async e=>{rows=null;$('run').disabled=true;try{const f=e.target.files[0];if(!f)return;const raw=RadarMobileSources.csv(await f.text());if(!raw.length||!['Date','HomeTeam','AwayTeam','FTHG','FTAG'].every(k=>k in raw[0]))throw Error('Faltan columnas obligatorias');rows=raw.map(r=>({...r,Date:parseDate(r.Date)})).filter(r=>r.Date&&r.HomeTeam&&r.AwayTeam&&r.FTHG!==''&&r.FTAG!==''&&Number.isInteger(Number(r.FTHG))&&Number.isInteger(Number(r.FTAG)));$('historyStatus').textContent='Histórico local válido: '+rows.length+' encuentros finalizados de '+raw.length+' registros. No se ha enviado el archivo.';$('run').disabled=false;$('runStatus').textContent='Preparado para calcular';}catch(err){$('historyStatus').textContent='ERROR: '+err.message}});
 async function refresh(){ $('refresh').disabled=true;$('sourceStatus').textContent='Consultando…';try{const reports=await RadarMobileSources.update(true);$('sourceStatus').textContent=reports.map(r=>r.name+': '+r.status+' · '+r.count+' registros · última fecha indicada '+(r.latest||'desconocida')+(r.error?' · '+r.error:'')).join(' | ')}catch(e){$('sourceStatus').textContent='ERROR: '+e.message}finally{$('refresh').disabled=false}}
 $('refresh').onclick=refresh;
