@@ -1,0 +1,34 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RADAR Matrix · Cuotas v14 SHADOW</title><style>
+:root{color-scheme:dark}body{background:#0c1220;color:#eef4ff;font:15px system-ui;margin:auto;max-width:950px;padding:16px}section,article{background:#18263c;border:1px solid #344861;border-radius:12px;padding:15px;margin:14px 0}p,small{color:#c5d3e6;line-height:1.5}input,button{font:inherit;background:#0d1b30;color:#fff;border:1px solid #7895b5;border-radius:7px;padding:9px;max-width:100%;box-sizing:border-box}button{cursor:pointer}label{display:block;margin:9px 0}input{width:100%}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}ul{padding-left:23px;line-height:1.5}a{color:#a8d3ff}.muted{color:#ffcc8a}.ok{color:#a7e8b2}strong{color:#b4dcff}hr{border:0;border-top:1px solid #344861;margin:18px 0}</style></head><body>
+<h1>RADAR Matrix · Cuotas v14 SHADOW</h1><p>Importación de propuestas desde el selector canónico. No se modifican CORE, SAT ni CP-032. Las frecuencias históricas no equivalen a probabilidades calibradas.</p><p><a href="./index.html">Volver al selector</a></p><section><h2>Transferencia</h2><p id="status">Comprobando transferencia…</p><button id="export">Exportar propuestas (CSV)</button></section><div id="items"></div>
+<script>
+(async()=>{'use strict';const $=id=>document.getElementById(id),raw=sessionStorage.getItem('radar-v14-transfer');
+const catalog=await fetch('./catalog139.json').then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()});
+if(catalog.length!==139||new Set(catalog.map(x=>x.id)).size!==139)throw Error('Catálogo no válido');
+const ids=new Map();for(const x of catalog){if(ids.has(x.label))throw Error('Etiqueta de mercado duplicada: '+x.label);ids.set(x.label,x.id)}
+let data=null;try{data=JSON.parse(raw)}catch(e){};
+if(!data||data.schema!==1||!Array.isArray(data.matches)){ $('status').textContent='No hay transferencia. Vuelve a RADAR, ejecuta el selector y pulsa «Enviar CORE/SAT». ';$('export').disabled=true;return;}
+const proposals=[];for(const match of data.matches){for(const v of match.variants||[]){const legs=(v.labels||[]).map(label=>({label,id:ids.get(label)||null}));proposals.push({match:match.match,name:v.name,legs,stats:v.stats||''});}}
+$('status').textContent=`${data.matches.length} partidos y ${proposals.length} propuestas recibidas. Identificadores contrastados con el catálogo de 139 mercados. Datos de precios: NO DISPONIBLES hasta introducir cuota real.`;
+function elt(tag,txt,cls){const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e}
+for(const [ix,p] of proposals.entries()){
+ const box=elt('article');box.append(elt('h2',p.match+' · '+p.name));const ul=elt('ul');for(const l of p.legs)ul.append(elt('li',l.label+' ['+(l.id||'ID NO ENCONTRADO')+']',l.id?'':'muted'));box.append(ul);
+ box.append(elt('p',p.stats||'Sin estadística de contraste visible.'));
+ if(p.legs.some(l=>!l.id)){box.append(elt('p','No se calcula: mercado sin correspondencia en el catálogo.','muted'));$('items').append(box);continue}
+ const grid=elt('div');grid.className='grid';
+ const labQ=elt('label','Cuota MyMatch observada');const q=elt('input');q.type='number';q.min='1.01';q.step='0.01';q.placeholder='Sin cuota';labQ.append(q);
+ const labP=elt('label','Probabilidad AJUSTADA (%) — opcional');const prob=elt('input');prob.type='number';prob.min='0';prob.max='100';prob.step='0.01';prob.placeholder='No calibrada';labP.append(prob);
+ const labAt=elt('label','Fecha y hora de observación');const at=elt('input');at.type='datetime-local';labAt.append(at);
+ grid.append(labQ,labP,labAt);box.append(grid);
+ const out=elt('p','Sin cuota observada: EV no calculable.');box.append(out);
+ const update=()=>{const price=q.value===''?null:Number(q.value),pp=prob.value===''?null:Number(prob.value)/100; p.price=price;p.p=pp;p.observed_at=at.value;
+  if(price===null){out.textContent='Sin cuota observada: EV no calculable.';return}
+  if(!Number.isFinite(price)||price<=1){out.textContent='Cuota inválida.';return}
+  const be=1/price;out.textContent='Punto de equilibrio: '+(100*be).toFixed(2)+' %. '+(pp===null?'EV NO CALCULABLE: falta probabilidad ajustada.':(!Number.isFinite(pp)||pp<0||pp>1?'Probabilidad inválida.':'EV teórico: '+(100*(pp*price-1)).toFixed(2)+' % (probabilidad introducida, NO VALIDADA).')); 
+ };
+ q.addEventListener('input',update);prob.addEventListener('input',update);at.addEventListener('input',update);$('items').append(box);
+}
+function cell(v){return '"'+String(v??'').replace(/"/g,'""')+'"'}
+$('export').onclick=()=>{const table=[['match','variant','market_ids','market_labels','holdout_display','combined_odds','observed_at','adjusted_probability_user','break_even','ev_theoretical','status']];for(const p of proposals){const valid=p.legs.every(x=>x.id),q=p.price,prob=p.p;const priceOK=valid&&Number.isFinite(q)&&q>1,probOK=prob!==null&&Number.isFinite(prob)&&prob>=0&&prob<=1;table.push([p.match,p.name,p.legs.map(x=>x.id||'').join(';'),p.legs.map(x=>x.label).join(';'),p.stats,priceOK?q:'',p.observed_at||'',probOK?prob:'',priceOK?1/q:'',priceOK&&probOK?prob*q-1:'',!valid?'INVALID_MARKET':!priceOK?'NO_OBSERVED_PRICE':!probOK?'NO_CALIBRATED_PROBABILITY':'SHADOW_USER_PROBABILITY_UNVALIDATED'])}const blob=new Blob(['\ufeff',table.map(r=>r.map(cell).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='radar_v14_propuestas_cuotas_shadow.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)};
+})().catch(e=>{document.getElementById('status').textContent='ERROR: '+e.message});
+</script></body></html>
