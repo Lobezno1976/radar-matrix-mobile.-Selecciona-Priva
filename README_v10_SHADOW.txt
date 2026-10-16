@@ -1,0 +1,2 @@
+RMv10 SHADOW — 16/10/2026
+Filtro comercial: doble límite de pérdida relativa del 30% por sustitución/contexto y sobre la cadena conjunta final respecto a la variante canónica original, por contexto. Si no hay sustitución admisible se conserva la original. Denominadores históricos compartidos. No verifica disponibilidad ni cuota. Motor CORE/SAT y CP-032 sin cambios. Requiere prueba funcional Android y backtest de regresión antes de canonizar.
