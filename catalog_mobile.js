@@ -14,7 +14,7 @@ function settle(r,id){let m=/^(SG|SL|SA[GL]|SH[GL]|RG|RL|FG|FL|CG|CL|CA[GL]|CH[G
 function parseDate(s){return g.RadarBrowserEngine.date(s)}
 function normalize(s){return g.RadarBrowserEngine.norm(s)}
 function merge(historical,provider){let map=new Map(historical.map(r=>[parseDate(r.Date)+'|'+normalize(r.HomeTeam)+'|'+normalize(r.AwayTeam),r]));let added=0,skipped=0,conflicts=0;
- for(let p of provider){let dt=parseDate(p.date),key=dt+'|'+normalize(p.home)+'|'+normalize(p.away);if(!dt||!p.home||!p.away||p.home_goals===null||p.away_goals===null||p.home_goals===''||p.away_goals===''){skipped++;continue}let r={Date:dt,HomeTeam:p.home,AwayTeam:p.away};for(let [to,from] of Object.entries({FTHG:'home_goals',FTAG:'away_goals',HS:'home_shots',AS:'away_shots',HST:'home_sot',AST:'away_sot',HC:'home_corners',AC:'away_corners',HY:'home_cards',AY:'away_cards',HF:'home_fouls',AF:'away_fouls',HTHG:'home_ht_goals',HTAG:'away_ht_goals'})){if(p[from]!==undefined&&p[from]!==null&&String(p[from]).trim()!=='')r[to]=p[from]}
+ for(let p of provider){let dt=parseDate(p.date),key=dt+'|'+normalize(p.home)+'|'+normalize(p.away);if(!dt||!p.home||!p.away){skipped++;continue}let r={Date:dt,HomeTeam:p.home,AwayTeam:p.away};for(let [to,from] of Object.entries({FTHG:'home_goals',FTAG:'away_goals',HS:'home_shots',AS:'away_shots',HST:'home_sot',AST:'away_sot',HC:'home_corners',AC:'away_corners',HY:'home_cards',AY:'away_cards',HF:'home_fouls',AF:'away_fouls',HTHG:'home_ht_goals',HTAG:'away_ht_goals'})){if(p[from]!==undefined&&p[from]!==null&&String(p[from]).trim()!=='')r[to]=p[from]}
  let old=map.get(key);if(old){if(number(old,'FTHG')!==null&&number(r,'FTHG')!==null&&(number(old,'FTHG')!==number(r,'FTHG')||number(old,'FTAG')!==number(r,'FTAG'))){conflicts++;continue}for(let k of required){if(number(old,k)===null&&number(r,k)!==null)old[k]=r[k]}}else{map.set(key,r);added++}}
  return {rows:[...map.values()],added,skipped,conflicts};}
 function select(rows,home,away,cutoff,markets,opts={}){if(normalize(home)===normalize(away))throw Error('Equipos idénticos');let minTrain=opts.minTrain??15,minTest=opts.minTest??5,width=opts.width??40;
@@ -23,7 +23,30 @@ function select(rows,home,away,cutoff,markets,opts={}){if(normalize(home)===norm
  let matrix=split.map(parts=>parts.map(part=>part.map(r=>markets.map(m=>settle(r,m.id))).filter(vals=>vals.every(v=>v!==null))));
  let counts=matrix.map(parts=>({train:parts[0].length,holdout:parts[1].length}));if(counts.some(x=>x.train<minTrain||x.holdout<minTest))return {status:'INSUFFICIENT_COMPLETE_CASES',counts,catalog_count:markets.length};
  const training=matrix.map(x=>x[0]);let evalSeq=(seq,samples)=>samples.map(sample=>{let hits=sample.filter(row=>seq.every(i=>row[i]===true)).length;return {hits,n:sample.length,pct:Math.round(100000*hits/sample.length)/1000}});
- let beam=[[]],examined=0;for(let depth=1;depth<=6;depth++){let next=[];for(let seq of beam){let old=evalSeq(seq,training);for(let i=0;i<markets.length;i++){if(seq.includes(i))continue;let cand=[...seq,i],v=evalSeq(cand,training);if(v.every((x,j)=>x.hits===old[j].hits))continue;examined++;let rates=v.map(x=>x.hits/x.n);next.push({cand,score:Math.min(...rates),sum:rates[0]+rates[1]})}}next.sort((a,b)=>b.score-a.score||b.sum-a.sum||a.cand.join(',').localeCompare(b.cand.join(',')));beam=next.slice(0,width).map(x=>x.cand);if(!beam.length)return {status:'NO_NONREDUNDANT_CHAIN',depth,counts}}
- let seq=beam[0],variants=[3,4,5,6].map((n,i)=>({name:['CORE','SAT1','SAT2','SAT3'][i],legs:seq.slice(0,n).map(j=>markets[j]),train_by_context:evalSeq(seq.slice(0,n),training),holdout_by_context:evalSeq(seq.slice(0,n),matrix.map(x=>x[1]))}));return {status:'MOBILE_139_BEAM',variants,counts,catalog_count:markets.length,extensions_examined:examined,nested:true,calibrated:false,match_joint_probability:null,global_optimum_proven:false}}
+ // SHADOW v9: elegir CORE al nivel 3, y extenderlo de forma anidada.
+ // Las muestras de entrenamiento/contraste siguen siendo casos completos para 139 mercados.
+ let beam=[[]],examined=0,chosen=null,stageScores=[];
+ for(let depth=1;depth<=6;depth++){
+  let next=[];
+  for(let seq of beam){
+   let old=evalSeq(seq,training);
+   for(let i=0;i<markets.length;i++){
+    if(seq.includes(i))continue;
+    let cand=[...seq,i],v=evalSeq(cand,training);
+    if(v.every((x,j)=>x.hits===old[j].hits))continue;
+    examined++;
+    let rates=v.map(x=>x.hits/x.n);
+    next.push({cand,score:Math.min(...rates),sum:rates[0]+rates[1]});
+   }
+  }
+  next.sort((a,b)=>b.score-a.score||b.sum-a.sum||a.cand.join(',').localeCompare(b.cand.join(',')));
+  if(!next.length)return {status:'NO_NONREDUNDANT_CHAIN',depth,counts,catalog_count:markets.length};
+  if(depth<3){beam=next.slice(0,width).map(x=>x.cand);continue;}
+  // A partir de CORE, las SAT no pueden cambiar las patas anteriores.
+  chosen=next[0].cand;stageScores.push({depth,score:next[0].score});beam=[chosen];
+ }
+ let seq=chosen,variants=[3,4,5,6].map((n,i)=>({name:['CORE','SAT1','SAT2','SAT3'][i],legs:seq.slice(0,n).map(j=>markets[j]),train_by_context:evalSeq(seq.slice(0,n),training),holdout_by_context:evalSeq(seq.slice(0,n),matrix.map(x=>x[1]))}));
+ return {status:'MOBILE_139_BEAM_SHADOW_V9',variants,counts,catalog_count:markets.length,extensions_examined:examined,nested:true,calibrated:false,match_joint_probability:null,global_optimum_proven:false,stageScores,complete_case_139:true};}
+
 async function loadCatalog(){let r=await fetch('./catalog139.json');if(!r.ok)throw Error('Catálogo HTTP '+r.status);return r.json()}
 g.RadarMobileCatalog={settle,merge,select,loadCatalog,required};})(typeof window!=='undefined'?window:globalThis);
