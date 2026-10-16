@@ -1,0 +1,1 @@
+RADAR Matrix v8: sustituir index.html, mobile_sources.js y sw.js en GitHub. Conservar catalog_mobile.js, catalog139.json, commercial_filter.js y el CSV privado. Diagnostico visible v8. Comprobacion estatica JavaScript OK; Android pendiente. No modifica CP-032.
