@@ -1,0 +1,1 @@
+Módulo experimental separado. Subir odds_shadow.html y odds_shadow.js al repositorio existente. No sustituye archivos v11. CSV: market_id,odds,observed_at. No hay conexión automática a Winamax. No infiere cuotas combinadas ni probabilidades ajustadas. CP-032 intacto.
