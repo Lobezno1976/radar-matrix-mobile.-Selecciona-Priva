@@ -100,4 +100,4 @@ $('runStatus').textContent+=' · Cálculo terminado. Revisar muestras y filas.'
 }catch(e){$('runStatus').textContent='ERROR: '+e.message}finally{$('run').disabled=false}};
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=9',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
 if(location.protocol.startsWith('http'))refresh();
-</script></body></html>
+</script><script src="./radar_bridge_v14.js?v=14"></script></body></html>
