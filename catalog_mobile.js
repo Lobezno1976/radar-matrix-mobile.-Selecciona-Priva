@@ -17,36 +17,45 @@ function merge(historical,provider){let map=new Map(historical.map(r=>[parseDate
  for(let p of provider){let dt=parseDate(p.date),key=dt+'|'+normalize(p.home)+'|'+normalize(p.away);if(!dt||!p.home||!p.away){skipped++;continue}let r={Date:dt,HomeTeam:p.home,AwayTeam:p.away};for(let [to,from] of Object.entries({FTHG:'home_goals',FTAG:'away_goals',HS:'home_shots',AS:'away_shots',HST:'home_sot',AST:'away_sot',HC:'home_corners',AC:'away_corners',HY:'home_cards',AY:'away_cards',HF:'home_fouls',AF:'away_fouls',HTHG:'home_ht_goals',HTAG:'away_ht_goals'})){if(p[from]!==undefined&&p[from]!==null&&String(p[from]).trim()!=='')r[to]=p[from]}
  let old=map.get(key);if(old){if(number(old,'FTHG')!==null&&number(r,'FTHG')!==null&&(number(old,'FTHG')!==number(r,'FTHG')||number(old,'FTAG')!==number(r,'FTAG'))){conflicts++;continue}for(let k of required){if(number(old,k)===null&&number(r,k)!==null)old[k]=r[k]}}else{map.set(key,r);added++}}
  return {rows:[...map.values()],added,skipped,conflicts};}
-function select(rows,home,away,cutoff,markets,opts={}){if(normalize(home)===normalize(away))throw Error('Equipos idénticos');let minTrain=opts.minTrain??15,minTest=opts.minTest??5,width=opts.width??40;
- let pools=[rows.filter(r=>parseDate(r.Date)<cutoff&&normalize(r.HomeTeam)===normalize(home)),rows.filter(r=>parseDate(r.Date)<cutoff&&normalize(r.AwayTeam)===normalize(away))].map(a=>a.sort((x,y)=>parseDate(x.Date).localeCompare(parseDate(y.Date))));
- let split=pools.map(a=>{let k=Math.floor(a.length*.8);return [a.slice(0,k),a.slice(k)]});
- let matrix=split.map(parts=>parts.map(part=>part.map(r=>markets.map(m=>settle(r,m.id))).filter(vals=>vals.every(v=>v!==null))));
- let counts=matrix.map(parts=>({train:parts[0].length,holdout:parts[1].length}));if(counts.some(x=>x.train<minTrain||x.holdout<minTest))return {status:'INSUFFICIENT_COMPLETE_CASES',counts,catalog_count:markets.length};
- const training=matrix.map(x=>x[0]);let evalSeq=(seq,samples)=>samples.map(sample=>{let hits=sample.filter(row=>seq.every(i=>row[i]===true)).length;return {hits,n:sample.length,pct:Math.round(100000*hits/sample.length)/1000}});
- // SHADOW v9: elegir CORE al nivel 3, y extenderlo de forma anidada.
- // Las muestras de entrenamiento/contraste siguen siendo casos completos para 139 mercados.
+function select(rows,home,away,cutoff,markets,opts={}){
+ if(normalize(home)===normalize(away))throw Error('Equipos idénticos');
+ const minTrain=opts.minTrain??15,minTest=opts.minTest??5,width=opts.width??40,minCoverage=opts.minCoverage??0.8;
+ if(!Number.isInteger(width)||width<1||minCoverage<=0||minCoverage>1)throw Error('Parámetros de búsqueda inválidos');
+ const pools=[rows.filter(r=>parseDate(r.Date)&&parseDate(r.Date)<cutoff&&normalize(r.HomeTeam)===normalize(home)),rows.filter(r=>parseDate(r.Date)&&parseDate(r.Date)<cutoff&&normalize(r.AwayTeam)===normalize(away))].map(a=>a.sort((x,y)=>parseDate(x.Date).localeCompare(parseDate(y.Date))));
+ const split=pools.map(a=>{const k=Math.floor(a.length*.8);return [a.slice(0,k),a.slice(k)]});
+ const matrix=split.map(parts=>parts.map(part=>part.map(r=>markets.map(m=>settle(r,m.id)))));
+ const available=matrix.map(parts=>({train:parts[0].length,holdout:parts[1].length}));
+ const complete=matrix.map(parts=>({train:parts[0].filter(v=>v.every(x=>x!==null)).length,holdout:parts[1].filter(v=>v.every(x=>x!==null)).length}));
+ const counts=available;
+ if(available.some(x=>x.train<minTrain||x.holdout<minTest))return {status:'INSUFFICIENT_CONTEXT_ROWS',counts,complete_case_counts:complete,catalog_count:markets.length};
+ const evalSeq=(seq,samples)=>samples.map(sample=>{let hits=0,n=0;for(const row of sample){if(seq.some(i=>row[i]===null))continue;n++;if(seq.every(i=>row[i]===true))hits++;}return {hits,n,pct:n?Math.round(100000*hits/n)/1000:null};});
+ const training=matrix.map(x=>x[0]),holdout=matrix.map(x=>x[1]);
+ const admissible=seq=>{const tr=evalSeq(seq,training),te=evalSeq(seq,holdout);return tr.every((v,j)=>v.n>=minTrain&&v.n>=Math.ceil(available[j].train*minCoverage)&&te[j].n>=minTest&&te[j].n>=Math.ceil(available[j].holdout*minCoverage));};
  let beam=[[]],examined=0,chosen=null,stageScores=[];
  for(let depth=1;depth<=6;depth++){
-  let next=[];
-  for(let seq of beam){
-   let old=evalSeq(seq,training);
+  const next=[];
+  for(const seq of beam){
    for(let i=0;i<markets.length;i++){
     if(seq.includes(i))continue;
-    let cand=[...seq,i],v=evalSeq(cand,training);
-    if(v.every((x,j)=>x.hits===old[j].hits))continue;
-    examined++;
-    let rates=v.map(x=>x.hits/x.n);
+    const cand=[...seq,i];if(!admissible(cand))continue;
+    const v=evalSeq(cand,training);
+    // Comparar la reducción de aciertos sobre EXACTAMENTE la misma cohorte evaluable.
+    // No se confunde una fila ausente con un fallo del mercado.
+    if(seq.length&&v.every((x,j)=>{
+     let oldHits=0;for(const row of training[j])if(cand.every(k=>row[k]!==null)&&seq.every(k=>row[k]===true))oldHits++;
+     return x.hits===oldHits;
+    }))continue;
+    examined++;const rates=v.map(x=>x.hits/x.n);
     next.push({cand,score:Math.min(...rates),sum:rates[0]+rates[1]});
    }
   }
   next.sort((a,b)=>b.score-a.score||b.sum-a.sum||a.cand.join(',').localeCompare(b.cand.join(',')));
-  if(!next.length)return {status:'NO_NONREDUNDANT_CHAIN',depth,counts,catalog_count:markets.length};
+  if(!next.length)return {status:'NO_ADMISSIBLE_CHAIN',depth,counts,complete_case_counts:complete,catalog_count:markets.length,min_coverage:minCoverage};
   if(depth<3){beam=next.slice(0,width).map(x=>x.cand);continue;}
-  // A partir de CORE, las SAT no pueden cambiar las patas anteriores.
   chosen=next[0].cand;stageScores.push({depth,score:next[0].score});beam=[chosen];
  }
- let seq=chosen,variants=[3,4,5,6].map((n,i)=>({name:['CORE','SAT1','SAT2','SAT3'][i],legs:seq.slice(0,n).map(j=>markets[j]),train_by_context:evalSeq(seq.slice(0,n),training),holdout_by_context:evalSeq(seq.slice(0,n),matrix.map(x=>x[1]))}));
- return {status:'MOBILE_139_BEAM_SHADOW_V9',variants,counts,catalog_count:markets.length,extensions_examined:examined,nested:true,calibrated:false,match_joint_probability:null,global_optimum_proven:false,stageScores,complete_case_139:true};}
-
+ const variants=[3,4,5,6].map((n,i)=>{const ids=chosen.slice(0,n);return {name:['CORE','SAT1','SAT2','SAT3'][i],legs:ids.map(j=>markets[j]),train_by_context:evalSeq(ids,training),holdout_by_context:evalSeq(ids,holdout)};});
+ return {status:'MOBILE_139_BEAM_SHADOW_V11',variants,counts,complete_case_counts:complete,catalog_count:markets.length,extensions_examined:examined,nested:true,calibrated:false,match_joint_probability:null,global_optimum_proven:false,stageScores,complete_case_139:false,min_coverage:minCoverage};
+}
 async function loadCatalog(){let r=await fetch('./catalog139.json');if(!r.ok)throw Error('Catálogo HTTP '+r.status);return r.json()}
 g.RadarMobileCatalog={settle,merge,select,loadCatalog,required};})(typeof window!=='undefined'?window:globalThis);

@@ -7,7 +7,7 @@ function contexts(rows,home,away,cutoff,catalog){
  return [rows.filter(r=>date(r.Date)&&date(r.Date)<cutoff&&norm(r.HomeTeam)===norm(home)),rows.filter(r=>date(r.Date)&&date(r.Date)<cutoff&&norm(r.AwayTeam)===norm(away))].map(a=>{
   a.sort((x,y)=>date(x.Date).localeCompare(date(y.Date)));
   const holdout=a.slice(Math.floor(a.length*.8));
-  return holdout.filter(row=>catalog.every(m=>g.RadarMobileCatalog.settle(row,m.id)!==null));
+  return holdout;
  });
 }
 function rates(samples,legs){return samples.map(sample=>{let n=0,hits=0;for(const row of sample){const vals=legs.map(l=>g.RadarMobileCatalog.settle(row,l.id));if(vals.some(v=>v===null))continue;n++;if(vals.every(Boolean))hits++;}return {hits,n,pct:n?Math.round(100000*hits/n)/1000:null};});}
@@ -30,8 +30,8 @@ function propose(rows,home,away,cutoff,catalog,variants,maxRelativeLoss=.30){
     }
    }
   }
-  if(!globalOK(adjusted))return {name:v.name,legs:v.legs.slice(),changes:[],original,adjustedRates:original,lossLimit:maxRelativeLoss,rollback:true,samples:'holdout común de casos completos de 139 mercados; exploración no calibrada'};
-  return {name:v.name,legs:adjusted,changes,original,adjustedRates:rates(samples,adjusted),lossLimit:maxRelativeLoss,rollback:false,samples:'holdout común de casos completos de 139 mercados; exploración no calibrada'};
+  if(!globalOK(adjusted))return {name:v.name,legs:v.legs.slice(),changes:[],original,adjustedRates:original,lossLimit:maxRelativeLoss,rollback:true,samples:'holdout cronológico; denominador por combinación evaluable; exploración no calibrada'};
+  return {name:v.name,legs:adjusted,changes,original,adjustedRates:rates(samples,adjusted),lossLimit:maxRelativeLoss,rollback:false,samples:'holdout cronológico; denominador por combinación evaluable; exploración no calibrada'};
  });
 }
 
