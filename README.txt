@@ -1,25 +1,8 @@
-RADAR MATRIX v14 SHADOW — puente CORE/SAT → Cuotas
+RADAR Matrix v15 DIVERSITY SHADOW — experimental, independent from CP-032.
+Upload only radar_diversity_v15.js and radar_diversity_v15.html to the same GitHub folder as index.html, catalog_mobile.js and catalog139.json.
+Open https://lobezno1976.github.io/radar-matrix-mobile.-Selecciona-Priva/radar_diversity_v15.html?v=15
+Historical CSV must first be loaded in the original app in the SAME browser origin. No canonical files are replaced.
 
-Archivos nuevos:
-- radar_bridge_v14.js
-- odds_shadow_v14.html
+Technical scope: explores all 139 markets in training, retains diverse candidate chains, prohibits two legs from the same broad market family, requires 2.5% to 60% marginal historical reduction in both local and away training samples and 80% evaluability. Searches depth 3, 4, 5 and 6 with separate candidate pools. Training determines candidate choice; holdout is displayed only. Up to five candidates per depth. No prices, EV, calibration or Winamax API. Heuristic search, not global optimization. Results are exploratory.
 
-INSTALACIÓN SIN ALTERAR EL MOTOR:
-1. Subir ambos archivos a la raíz del repositorio GitHub.
-2. En index.html añadir JUSTO ANTES de </body> esta línea:
-   <script src="./radar_bridge_v14.js?v=14"></script>
-3. Guardar, abrir index.html con ?v=14, cargar el CSV privado si hace falta y ejecutar RADAR.
-4. Pulsar «Enviar CORE/SAT al módulo de cuotas SHADOW».
-5. En la página de cuotas, introducir las cuotas combinadas realmente observadas.
-
-La transferencia usa sessionStorage en la misma pestaña y NO incluye el CSV privado.
-La página no obtiene cuotas de Winamax ni calcula probabilidades prospectivas calibradas.
-La probabilidad ajustada opcional es introducida por el usuario y se etiqueta NO VALIDADA.
-El botón de transferencia captura las propuestas visibles de #results; no altera el selector.
-
-LIMITACIONES:
-- La integración requiere editar una línea de index.html. Sin ella el puente no aparece.
-- La transferencia se pierde si se cierra la pestaña o se borra su sessionStorage.
-- Las estadísticas se copian literalmente de la interfaz; no se recomputan.
-- No se ha probado con el CSV privado del usuario ni en su Android.
-- CP-032 y archivos del motor se mantienen sin modificar en este paquete.
+Known limitations: broad family exclusivity can exclude valid complementary markets; minimum marginal drop and scoring weights are experimental assumptions, not validated; historical holdout is not independent across repeated user-driven trials; date normalization and club aliases should be audited; sample sizes can be small. Must be compared prospectively against frozen v11 before promotion. No modifications to CP-032.
