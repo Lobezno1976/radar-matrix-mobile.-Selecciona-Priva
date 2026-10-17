@@ -1,0 +1,8 @@
+RADAR Matrix v18 — corrección visual SHADOW
+
+Sube SOLO radar_jornada_v18.html a la raíz del repositorio GitHub.
+Abre: https://lobezno1976.github.io/radar-matrix-mobile.-Selecciona-Priva/radar_jornada_v18.html?v=18
+
+Cambios: tarjetas verticales por partido; CORE/SAT y auditoría 1X/X2/12 visibles sin desplazamiento horizontal; botones de alternativas visibles.
+No cambia el algoritmo v15, el histórico privado, el catálogo ni CP-032.
+Verificación: revisión estática de HTML/JS y ZIP. Pendiente prueba real en Samsung con histórico privado.
