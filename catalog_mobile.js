@@ -36,7 +36,7 @@ function select(rows,home,away,cutoff,markets,opts={}){
    const id=m.id,parsed=g.RadarBidirectionalSelector&&g.RadarBidirectionalSelector.parse(id);
    const family=parsed?parsed.group:id.startsWith('WC_')?'C:total':id.startsWith('WT_')?'T:total':'G:total';
    const method=policy.METHODS[family]||'raw',vec=policy.WEIGHTS[family];
-   const weights=method==='optimized'&&vec?vec:method==='uniform'?policy.WINDOWS.map(()=>1/6):null;
+   const weights=method==='optimized'&&vec?vec:method==='uniform'||method==='optimized'?policy.WINDOWS.map(()=>1/6):null;
    const current=policy.season(cutoff),train=parts[0];
    const years=train.map(row=>policy.season(parseDate(row.Date)));
    const totals=policy.WINDOWS.map(n=>years.filter(y=>y!==null&&(n===0?y===current:y>=current-n&&y<=current)).length);
