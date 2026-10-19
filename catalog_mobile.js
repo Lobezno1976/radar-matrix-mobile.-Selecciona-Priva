@@ -50,10 +50,10 @@ function select(rows,home,away,cutoff,markets,opts={}){
  const rankRates=seq=>{
    if(!weighted)return evalSeq(seq,training).map(x=>x.hits/x.n);
    return training.map((sample,j)=>{
-     const weights=rowWeights[j][seq[0]];let yes=0,total=0;
+     let yes=0,total=0;
      for(let k=0;k<sample.length;k++){
        if(seq.some(i=>sample[k][i]===null))continue;
-       total+=weights[k];if(seq.every(i=>sample[k][i]===true))yes+=weights[k];
+       const weight=seq.map(i=>rowWeights[j][i][k]).reduce((a,b)=>a+b,0)/seq.length;total+=weight;if(seq.every(i=>sample[k][i]===true))yes+=weight;
      }
      return total?yes/total:0;
    });
