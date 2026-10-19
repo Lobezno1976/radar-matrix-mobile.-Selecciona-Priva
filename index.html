@@ -73,7 +73,7 @@ for(const [home,away] of selectedMatches){
 const card=document.createElement('article');card.className='match-card';
 const heading=document.createElement('h3');heading.textContent=home+' – '+away;card.appendChild(heading);$('results').appendChild(card);
 try{
-const r=RadarMobileCatalog.select(merged.rows,home,away,$('cutoff').value,catalog);
+const r=RadarMobileCatalog.select(merged.rows,home,away,$('cutoff').value,catalog,{useWeights:true});
 if(r.variants){
 const commercial=RadarCommercialFilter.propose(merged.rows,home,away,$('cutoff').value,catalog,r.variants);
 // CP-032: análisis paralelo sin alterar el selector congelado.
