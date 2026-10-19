@@ -11,7 +11,7 @@ const WEIGHTS={
 };
 const METHODS={'G:total':'raw','G:home':'raw','G:away':'raw','C:total':'uniform','C:home':'raw','C:away':'raw','T:total':'uniform','T:home':'optimized','T:away':'optimized','R:total':'uniform','S:total':'uniform','F:total':'optimized'};
 function season(value){if(value==null)return null;const m=String(value).match(/(20\d\d|19\d\d)/);if(!m)return null;const year=+m[1];if(/^\d{4}-\d\d-\d\d/.test(String(value))){const month=+String(value).slice(5,7);return year-(month<7?1:0);}if(/^\d\d\/\d\d\/(19|20)\d\d/.test(String(value))){const month=+String(value).slice(3,5);return year-(month<7?1:0);}return year;}
-function dateValue(x){const d=new Date(x);return Number.isFinite(d.getTime())?d.getTime():NaN;}
+function dateValue(x){const v=String(x||'');const m=/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/.exec(v);if(m)return Date.UTC(+m[3],+m[2]-1,+m[1]);const d=new Date(v);return Number.isFinite(d.getTime())?d.getTime():NaN;}
 function rowSeason(row){return Number.isInteger(+row.season)?+row.season:season(row.Date);}
 function filtered(rows,cutoff){const limit=dateValue(cutoff);if(!Number.isFinite(limit))throw Error('Fecha de corte inválida');return rows.filter(r=>dateValue(r.Date)<limit);}
 function score(rows,market,base,settle,cutoff,method,weights){
