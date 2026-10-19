@@ -8,6 +8,9 @@ const WEIGHTS={
  'G:home':[.1595,.6711,.0251,.0006,.0971,.0466],
  'G:away':[0,0,0,0,0,1],
  'C:total':[.2367,.1857,.0183,.0143,.4374,.1076],
+ 'T:home':[.2052,.0376,.0324,.4091,.1158,.1998],
+ 'T:away':[.6624,.009,.1553,.1189,.0264,.028],
+ 'F:total':[.2773,.1635,.3046,.1545,.085,.0151],
 };
 const METHODS={'G:total':'raw','G:home':'raw','G:away':'raw','C:total':'uniform','C:home':'raw','C:away':'raw','T:total':'uniform','T:home':'optimized','T:away':'optimized','R:total':'uniform','S:total':'uniform','F:total':'optimized'};
 function season(value){if(value==null)return null;const m=String(value).match(/(20\d\d|19\d\d)/);if(!m)return null;const year=+m[1];if(/^\d{4}-\d\d-\d\d/.test(String(value))){const month=+String(value).slice(5,7);return year-(month<7?1:0);}if(/^\d\d\/\d\d\/(19|20)\d\d/.test(String(value))){const month=+String(value).slice(3,5);return year-(month<7?1:0);}return year;}
