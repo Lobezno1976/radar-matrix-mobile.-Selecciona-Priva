@@ -30,6 +30,34 @@ function select(rows,home,away,cutoff,markets,opts={}){
  if(available.some(x=>x.train<minTrain||x.holdout<minTest))return {status:'INSUFFICIENT_CONTEXT_ROWS',counts,complete_case_counts:complete,catalog_count:markets.length};
  const evalSeq=(seq,samples)=>samples.map(sample=>{let hits=0,n=0;for(const row of sample){if(seq.some(i=>row[i]===null))continue;n++;if(seq.every(i=>row[i]===true))hits++;}return {hits,n,pct:n?Math.round(100000*hits/n)/1000:null};});
  const training=matrix.map(x=>x[0]),holdout=matrix.map(x=>x[1]);
+ const policy=opts.weightPolicy||g.RadarWeightPolicy;
+ const weighted=opts.useWeights===true&&!!policy;
+ const rowWeights=weighted?split.map(parts=>markets.map(m=>{
+   const id=m.id,parsed=g.RadarBidirectionalSelector&&g.RadarBidirectionalSelector.parse(id);
+   const family=parsed?parsed.group:id.startsWith('WC_')?'C:total':id.startsWith('WT_')?'T:total':'G:total';
+   const method=policy.METHODS[family]||'raw',vec=policy.WEIGHTS[family];
+   const weights=method==='optimized'&&vec?vec:method==='uniform'?policy.WINDOWS.map(()=>1/6):null;
+   const current=policy.season(cutoff),train=parts[0];
+   const years=train.map(row=>policy.season(parseDate(row.Date)));
+   const totals=policy.WINDOWS.map(n=>years.filter(y=>y!==null&&(n===0?y===current:y>=current-n&&y<=current)).length);
+   return years.map(y=>{
+     if(y===null||y>current||y<current-20)return 0;
+     if(!weights)return 1;
+     let w=0;for(let k=0;k<weights.length;k++){const n=policy.WINDOWS[k];if(totals[k]&&(n===0?y===current:y>=current-n))w+=weights[k]/totals[k];}
+     return w;
+   });
+ })):null;
+ const rankRates=seq=>{
+   if(!weighted)return evalSeq(seq,training).map(x=>x.hits/x.n);
+   return training.map((sample,j)=>{
+     const weights=rowWeights[j][seq[0]];let yes=0,total=0;
+     for(let k=0;k<sample.length;k++){
+       if(seq.some(i=>sample[k][i]===null))continue;
+       total+=weights[k];if(seq.every(i=>sample[k][i]===true))yes+=weights[k];
+     }
+     return total?yes/total:0;
+   });
+ };
  const admissible=seq=>{const tr=evalSeq(seq,training),te=evalSeq(seq,holdout);return tr.every((v,j)=>v.n>=minTrain&&v.n>=Math.ceil(available[j].train*minCoverage)&&te[j].n>=minTest&&te[j].n>=Math.ceil(available[j].holdout*minCoverage));};
  let beam=[[]],examined=0,chosen=null,stageScores=[];
  for(let depth=1;depth<=6;depth++){
@@ -45,7 +73,7 @@ function select(rows,home,away,cutoff,markets,opts={}){
      let oldHits=0;for(const row of training[j])if(cand.every(k=>row[k]!==null)&&seq.every(k=>row[k]===true))oldHits++;
      return x.hits===oldHits;
     }))continue;
-    examined++;const rates=v.map(x=>x.hits/x.n);
+    examined++;const rates=rankRates(cand);
     next.push({cand,score:Math.min(...rates),sum:rates[0]+rates[1]});
    }
   }
@@ -55,7 +83,7 @@ function select(rows,home,away,cutoff,markets,opts={}){
   chosen=next[0].cand;stageScores.push({depth,score:next[0].score});beam=[chosen];
  }
  const variants=[3,4,5,6].map((n,i)=>{const ids=chosen.slice(0,n);return {name:['CORE','SAT1','SAT2','SAT3'][i],legs:ids.map(j=>markets[j]),train_by_context:evalSeq(ids,training),holdout_by_context:evalSeq(ids,holdout)};});
- return {status:'MOBILE_139_BEAM_SHADOW_V11',variants,counts,complete_case_counts:complete,catalog_count:markets.length,extensions_examined:examined,nested:true,calibrated:false,match_joint_probability:null,global_optimum_proven:false,stageScores,complete_case_139:false,min_coverage:minCoverage};
+ return {status:'MOBILE_139_BEAM_SHADOW_V11',variants,counts,complete_case_counts:complete,catalog_count:markets.length,extensions_examined:examined,nested:true,calibrated:false,match_joint_probability:null,global_optimum_proven:false,stageScores,complete_case_139:false,min_coverage:minCoverage,weighting_applied:weighted};
 }
 async function loadCatalog(){let r=await fetch('./catalog139.json');if(!r.ok)throw Error('Catálogo HTTP '+r.status);return r.json()}
 g.RadarMobileCatalog={settle,merge,select,loadCatalog,required};})(typeof window!=='undefined'?window:globalThis);
