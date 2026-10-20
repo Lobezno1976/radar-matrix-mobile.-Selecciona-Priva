@@ -69,12 +69,12 @@ function renderMatrixSummary(items){
  const thead=document.createElement('thead'),head=document.createElement('tr');const columns=['Partido',...keys.map(k=>markets.get(k)),'% CORE','% SAT1','% SAT2','% SAT3'];
  columns.forEach((label,i)=>{const th=document.createElement('th');th.textContent=label;if(i===0)th.className='sticky-match';if(i>keys.length)th.className='rate-head';head.appendChild(th)});thead.appendChild(head);table.appendChild(thead);
  const tbody=document.createElement('tbody');for(const item of items){const tr=document.createElement('tr');const name=document.createElement('th');name.scope='row';name.className='sticky-match';name.textContent=item.match;tr.appendChild(name);
- for(const k of keys){const td=document.createElement('td');td.className='market-cell';const selected=[];(item.variants||[]).forEach((v,i)=>{if((v.legs||[]).some(l=>String(l.id??l.code??l.label)===k))selected.push(i)});
- for(const i of selected){const tag=document.createElement('span');tag.className='matrix-tag '+['core','sat1','sat2','sat3'][i];tag.textContent='X';tag.title=['CORE','SAT1','SAT2','SAT3'][i]+' · '+markets.get(k);td.appendChild(tag)}tr.appendChild(td)}
+ for(const k of keys){const td=document.createElement('td');td.className='market-cell';const selected=[];(item.variants||[]).forEach((v,i)=>{if((v.legs||[]).some(l=>String(l.id??l.code??l.label)===k))selected.push(i)});const first=selected.length?selected[0]:null;
+ for(const i of (first===null?[]:[first])){const tag=document.createElement('span');tag.className='matrix-tag '+['core','sat1','sat2','sat3'][i];tag.textContent='X';tag.title=['CORE','SAT1','SAT2','SAT3'][i]+' · '+markets.get(k);td.appendChild(tag)}tr.appendChild(td)}
  for(let i=0;i<4;i++){const td=document.createElement('td');td.className='rate-cell '+['core','sat1','sat2','sat3'][i];const v=item.variants?.[i];if(v){const ctx=v.holdout_by_context||[];const hits=ctx.reduce((n,c)=>n+(Number(c.hits)||0),0),n=ctx.reduce((n,c)=>n+(Number(c.n)||0),0);td.textContent=n?(100*hits/n).toFixed(1)+'%':'—';td.title='Contraste histórico combinado · '+hits+'/'+n+' casos evaluables (local y visitante)'}else td.textContent='—';tr.appendChild(td)}
  if(!item.variants){name.title=item.status||'Sin selección'}tbody.appendChild(tr)}
  table.appendChild(tbody);wrap.appendChild(table);root.appendChild(wrap);
- const foot=document.createElement('p');foot.className='muted';foot.textContent='X = selección incluida en esa rama. Un mercado puede aparecer en varias ramas. Porcentajes = frecuencias históricas de contraste de la combinación, no probabilidades futuras. Desliza horizontalmente para ver todos los mercados.';root.appendChild(foot);
+ const foot=document.createElement('p');foot.className='muted';foot.textContent='X = selección incluida en esa rama. Cada mercado se marca una sola vez, con el color de la primera rama en que aparece. Porcentajes = frecuencias históricas de contraste de la combinación, no probabilidades futuras. Desliza horizontalmente para ver todos los mercados.';root.appendChild(foot);
 }
 $('run').onclick=async()=>{if(!rows)return;$('run').disabled=true;$('matrixSummary').replaceChildren();const summaryRows=[];try{
 // Se consultan las fuentes antes de calcular; los fallos quedan visibles.
@@ -96,6 +96,6 @@ try{
 await new Promise(resolve=>setTimeout(resolve,0))}
 renderMatrixSummary(summaryRows);$('runStatus').textContent+=' · Cálculo terminado. Revisar muestras y filas.'
 }catch(e){$('runStatus').textContent='ERROR: '+e.message}finally{$('run').disabled=false}};
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=14',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=15',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
 if(location.protocol.startsWith('http'))refresh();
 </script><script src="./radar_bridge_v14.js?v=14"></script></body></html>
