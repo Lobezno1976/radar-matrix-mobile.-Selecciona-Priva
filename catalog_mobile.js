@@ -17,6 +17,18 @@ function merge(historical,provider){let map=new Map(historical.map(r=>[parseDate
  for(let p of provider){let dt=parseDate(p.date),key=dt+'|'+normalize(p.home)+'|'+normalize(p.away);if(!dt||!p.home||!p.away){skipped++;continue}let r={Date:dt,HomeTeam:p.home,AwayTeam:p.away};for(let [to,from] of Object.entries({FTHG:'home_goals',FTAG:'away_goals',HS:'home_shots',AS:'away_shots',HST:'home_sot',AST:'away_sot',HC:'home_corners',AC:'away_corners',HY:'home_cards',AY:'away_cards',HF:'home_fouls',AF:'away_fouls',HTHG:'home_ht_goals',HTAG:'away_ht_goals'})){if(p[from]!==undefined&&p[from]!==null&&String(p[from]).trim()!=='')r[to]=p[from]}
  let old=map.get(key);if(old){if(number(old,'FTHG')!==null&&number(r,'FTHG')!==null&&(number(old,'FTHG')!==number(r,'FTHG')||number(old,'FTAG')!==number(r,'FTAG'))){conflicts++;continue}for(let k of required){if(number(old,k)===null&&number(r,k)!==null)old[k]=r[k]}}else{map.set(key,r);added++}}
  return {rows:[...map.values()],added,skipped,conflicts};}
+function marketGroup(id){
+ const m=/^(SG|SL|SA[GL]|SH[GL]|RG|RL|FG|FL|CG|CL|CA[GL]|CH[GL]|TG|TL|TA[GL]|TH[GL]|GG|GL|GA[GL]|GH[GL]|GO[12][GL])(\\d+)p5$/.exec(id);
+ if(!m)return null;
+ const code=m[1];const family=code[0];const period=code.startsWith('GO')?code.slice(0,3):'FT';
+ const side=code.startsWith('GO')?'total':(['SG','SL','RG','RL','FG','FL','CG','CL','TG','TL','GG','GL'].includes(code)?'total':code[1]==='H'?'home':'away');
+ return family+':'+period+':'+side;
+}
+function redundantMarkets(seq,markets){
+ const seen=new Set();
+ for(const i of seq){const group=marketGroup(markets[i].id);if(group&&seen.has(group))return true;if(group)seen.add(group)}
+ return false;
+}
 function select(rows,home,away,cutoff,markets,opts={}){
  if(normalize(home)===normalize(away))throw Error('Equipos idénticos');
  const minTrain=opts.minTrain??15,minTest=opts.minTest??5,width=opts.width??40,minCoverage=opts.minCoverage??0.8;
@@ -65,7 +77,7 @@ function select(rows,home,away,cutoff,markets,opts={}){
   for(const seq of beam){
    for(let i=0;i<markets.length;i++){
     if(seq.includes(i))continue;
-    const cand=[...seq,i];if(!admissible(cand))continue;
+    const cand=[...seq,i];if(redundantMarkets(cand,markets)||!admissible(cand))continue;
     const v=evalSeq(cand,training);
     // Comparar la reducción de aciertos sobre EXACTAMENTE la misma cohorte evaluable.
     // No se confunde una fila ausente con un fallo del mercado.
@@ -86,4 +98,4 @@ function select(rows,home,away,cutoff,markets,opts={}){
  return {status:'MOBILE_139_BEAM_SHADOW_V11',variants,counts,complete_case_counts:complete,catalog_count:markets.length,extensions_examined:examined,nested:true,calibrated:false,match_joint_probability:null,global_optimum_proven:false,stageScores,complete_case_139:false,min_coverage:minCoverage,weighting_applied:weighted};
 }
 async function loadCatalog(){let r=await fetch('./catalog139.json');if(!r.ok)throw Error('Catálogo HTTP '+r.status);return r.json()}
-g.RadarMobileCatalog={settle,merge,select,loadCatalog,required};})(typeof window!=='undefined'?window:globalThis);
+g.RadarMobileCatalog={settle,merge,select,loadCatalog,required,marketGroup,redundantMarkets};})(typeof window!=='undefined'?window:globalThis);
