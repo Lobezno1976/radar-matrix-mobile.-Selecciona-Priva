@@ -1,0 +1,23 @@
+name: CP-032 weighted regression
+on:
+  push:
+    branches: [feature/bidirectional-market-selector]
+  pull_request:
+    paths:
+      - 'catalog_mobile.js'
+      - 'weight_policy_cp032.js'
+      - 'bidirectional_selector.js'
+      - 'tests/cp032_weighted_regression.js'
+      - '.github/workflows/cp032-regression.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check catalog_mobile.js
+      - run: node --check weight_policy_cp032.js
+      - run: node --check bidirectional_selector.js
+      - run: node tests/cp032_weighted_regression.js
