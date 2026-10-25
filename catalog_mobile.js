@@ -24,9 +24,29 @@ function marketGroup(id){
  const side=code.startsWith('GO')?'total':(['SG','SL','RG','RL','FG','FL','CG','CL','TG','TL','GG','GL'].includes(code)?'total':code[1]==='H'?'home':'away');
  return family+':'+period+':'+side;
 }
+function specialDomain(id){return id.startsWith('W_')?'W':id.startsWith('WC_')?'WC':id.startsWith('WT_')?'WT':id.startsWith('BTTS_')?'BTTS':null}
+function specialConflict(a,b){
+ const domain=specialDomain(a);if(!domain||domain!==specialDomain(b))return false;
+ // Resultado, córners y tarjetas: diferencia -6..+6 cubre los umbrales exactos y 3+.
+ // BTTS: dos estados exhaustivos (sí/no). No se descartan relaciones parciales.
+ const outcomes=domain==='BTTS'?[0,1]:[-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
+ const hits=id=>outcomes.map(d=>{
+  if(domain==='BTTS')return id==='BTTS_Y'?d===1:d===0;
+  const r={FTHG:Math.max(d,0),FTAG:Math.max(-d,0),HC:Math.max(d,0),AC:Math.max(-d,0),HY:Math.max(d,0),AY:Math.max(-d,0)};
+  return settle(r,id);
+ });
+ const x=hits(a),y=hits(b);let xy=0,xOnly=0,yOnly=0;
+ for(let k=0;k<outcomes.length;k++){if(x[k]&&y[k])xy++;else if(x[k])xOnly++;else if(y[k])yOnly++}
+ return xy===0||xOnly===0||yOnly===0;
+}
 function redundantMarkets(seq,markets){
- const seen=new Set();
- for(const i of seq){const group=marketGroup(markets[i].id);if(group&&seen.has(group))return true;if(group)seen.add(group)}
+ const seen=new Set(),special=[];
+ for(const i of seq){
+  const id=markets[i].id,group=marketGroup(id);
+  if(group&&seen.has(group))return true;
+  if(group)seen.add(group);
+  if(specialDomain(id)){for(const prior of special)if(specialConflict(prior,id))return true;special.push(id)}
+ }
  return false;
 }
 function select(rows,home,away,cutoff,markets,opts={}){
