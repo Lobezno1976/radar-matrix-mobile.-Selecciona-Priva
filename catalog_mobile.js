@@ -18,7 +18,7 @@ function merge(historical,provider){let map=new Map(historical.map(r=>[parseDate
  let old=map.get(key);if(old){if(number(old,'FTHG')!==null&&number(r,'FTHG')!==null&&(number(old,'FTHG')!==number(r,'FTHG')||number(old,'FTAG')!==number(r,'FTAG'))){conflicts++;continue}for(let k of required){if(number(old,k)===null&&number(r,k)!==null)old[k]=r[k]}}else{map.set(key,r);added++}}
  return {rows:[...map.values()],added,skipped,conflicts};}
 function marketGroup(id){
- const m=/^(SG|SL|SA[GL]|SH[GL]|RG|RL|FG|FL|CG|CL|CA[GL]|CH[GL]|TG|TL|TA[GL]|TH[GL]|GG|GL|GA[GL]|GH[GL]|GO[12][GL])(\\d+)p5$/.exec(id);
+ const m=/^(SG|SL|SA[GL]|SH[GL]|RG|RL|FG|FL|CG|CL|CA[GL]|CH[GL]|TG|TL|TA[GL]|TH[GL]|GG|GL|GA[GL]|GH[GL]|GO[12][GL])(\d+)p5$/.exec(id);
  if(!m)return null;
  const code=m[1];const family=code[0];const period=code.startsWith('GO')?code.slice(0,3):'FT';
  const side=code.startsWith('GO')?'total':(['SG','SL','RG','RL','FG','FL','CG','CL','TG','TL','GG','GL'].includes(code)?'total':code[1]==='H'?'home':'away');
