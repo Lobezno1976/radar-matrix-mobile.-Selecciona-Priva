@@ -1,4 +1,5 @@
-"""CP-033 joint-frequency reference implementation, aligned to cp033_joint.js v0.2."""
+"""CP-033 joint-frequency reference implementation, aligned to cp033_joint.js."""
+from cp033_semantic import conflict as semantic_conflict
 def build(rows, markets, settle, cutoff, options=None):
     o=options or {}
     minimum=o.get('minSample',20);core=o.get('coreSize',3);sat=o.get('satCount',3)
@@ -11,7 +12,7 @@ def build(rows, markets, settle, cutoff, options=None):
         n=len(values);hits=sum(v is True for v in values)
         if n>=minimum:candidates.append(dict(index=i,id=m['id'],n=n,frequency=hits/n))
     candidates=sorted(candidates,key=lambda x:(-x['frequency'],-x['n'],x['id']))[:o.get('maxCandidates',40)]
-    conflict=o.get('conflicts') or (lambda a,b:bool(a.get('group') and b.get('group') and a['group']==b['group']))
+    conflict=o.get('conflicts') or (lambda a,b:semantic_conflict(a,b,settle))
     prices=o.get('verifiedJointOdds',{})
     def evaluate(indices):
         ids=[markets[i]['id'] for i in indices];n=hits=0
