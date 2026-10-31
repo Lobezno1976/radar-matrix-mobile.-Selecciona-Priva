@@ -134,7 +134,29 @@ function select(rows,home,away,cutoff,markets,opts={}){
     next.push({cand,score:Math.min(...rates),sum:rates[0]+rates[1]});
    }
   }
-  next.sort((a,b)=>b.score-a.score||b.sum-a.sum||a.cand.join(',').localeCompare(b.cand.join(',')));
+  // Price-aware selection: compare admissible alternatives before pruning redundant markets.
+  // Without verified odds, retain historical-frequency ordering; never infer profitability.
+  const price=opts.verifiedOdds||null;
+  const priced=seq=>{
+    if(!price)return null;
+    const ids=seq.map(i=>markets[i].id);
+    const quotes=ids.map(id=>price[id]);
+    if(quotes.some(q=>!q||!Number.isFinite(Number(q.odds))||Number(q.odds)<=1||q.verified!==true))return null;
+    // Joint decimal odds are not the product of correlated legs: require an executable quote.
+    const key=ids.join('|'),joint=opts.verifiedJointOdds?.[key];
+    if(!joint||joint.verified!==true||!Number.isFinite(Number(joint.odds))||Number(joint.odds)<=1)return null;
+    return Number(joint.odds);
+  };
+  const valueOf=c=>{
+    const odds=priced(c.cand);
+    return odds===null?null:c.score*odds-1;
+  };
+  next.sort((a,b)=>{
+    const va=valueOf(a),vb=valueOf(b);
+    if(va!==null&&vb!==null&&va!==vb)return vb-va;
+    // Never rank unpriced alternatives as if they had a verified EV.
+    return b.score-a.score||b.sum-a.sum||a.cand.join(',').localeCompare(b.cand.join(','));
+  });
   if(!next.length)return {status:'NO_ADMISSIBLE_CHAIN',depth,counts,complete_case_counts:complete,catalog_count:markets.length,min_coverage:minCoverage};
   if(depth<3){beam=next.slice(0,width).map(x=>x.cand);continue;}
   chosen=next[0].cand;stageScores.push({depth,score:next[0].score});beam=[chosen];
