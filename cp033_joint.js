@@ -44,7 +44,7 @@ function build(rows,markets,settle,cutoff,options={}){
   const ranked=[...unique.values()].sort(cmp);
   if(!ranked.length)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined};
   const best=ranked[0];stages.push({depth,...best,indices:undefined});
-  beam=ranked.slice(0,beamWidth);
+  beam=depth>=coreSize?[best]:ranked.slice(0,beamWidth);
  }
  const core=stages[coreSize-1],sat=stages.slice(coreSize,coreSize+satCount);
  return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',core,sat,stages,examined,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
