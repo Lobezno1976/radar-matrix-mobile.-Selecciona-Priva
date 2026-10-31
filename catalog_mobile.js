@@ -18,15 +18,60 @@ function merge(historical,provider){let map=new Map(historical.map(r=>[parseDate
  let old=map.get(key);if(old){if(number(old,'FTHG')!==null&&number(r,'FTHG')!==null&&(number(old,'FTHG')!==number(r,'FTHG')||number(old,'FTAG')!==number(r,'FTAG'))){conflicts++;continue}for(let k of required){if(number(old,k)===null&&number(r,k)!==null)old[k]=r[k]}}else{map.set(key,r);added++}}
  return {rows:[...map.values()],added,skipped,conflicts};}
 function marketGroup(id){
- const m=/^(SG|SL|SA[GL]|SH[GL]|RG|RL|FG|FL|CG|CL|CA[GL]|CH[GL]|TG|TL|TA[GL]|TH[GL]|GG|GL|GA[GL]|GH[GL]|GO[12][GL])(\\d+)p5$/.exec(id);
+ const m=/^(SG|SL|SA[GL]|SH[GL]|RG|RL|FG|FL|CG|CL|CA[GL]|CH[GL]|TG|TL|TA[GL]|TH[GL]|GG|GL|GA[GL]|GH[GL]|GO[12][GL])(\d+)p5$/.exec(id);
  if(!m)return null;
  const code=m[1];const family=code[0];const period=code.startsWith('GO')?code.slice(0,3):'FT';
  const side=code.startsWith('GO')?'total':(['SG','SL','RG','RL','FG','FL','CG','CL','TG','TL','GG','GL'].includes(code)?'total':code[1]==='H'?'home':'away');
  return family+':'+period+':'+side;
 }
+function specialDomain(id){return id.startsWith('W_')?'W':id.startsWith('WC_')?'WC':id.startsWith('WT_')?'WT':id.startsWith('BTTS_')?'BTTS':null}
+function specialConflict(a,b){
+ const domain=specialDomain(a);if(!domain||domain!==specialDomain(b))return false;
+ // Resultado, córners y tarjetas: diferencia -6..+6 cubre los umbrales exactos y 3+.
+ // BTTS: dos estados exhaustivos (sí/no). No se descartan relaciones parciales.
+ const outcomes=domain==='BTTS'?[0,1]:[-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
+ const hits=id=>outcomes.map(d=>{
+  if(domain==='BTTS')return id==='BTTS_Y'?d===1:d===0;
+  const r={FTHG:Math.max(d,0),FTAG:Math.max(-d,0),HC:Math.max(d,0),AC:Math.max(-d,0),HY:Math.max(d,0),AY:Math.max(-d,0)};
+  return settle(r,id);
+ });
+ const x=hits(a),y=hits(b);let xy=0,xOnly=0,yOnly=0;
+ for(let k=0;k<outcomes.length;k++){if(x[k]&&y[k])xy++;else if(x[k])xOnly++;else if(y[k])yOnly++}
+ return xy===0||xOnly===0||yOnly===0;
+}
+// Contraste semántico transversal: sólo pares con al menos un mercado especial.
+// Se conservan las alternativas de distinta familia cuando ambas aportan información.
+function semanticConflict(a,b){
+ const domain=id=>id.startsWith('W_')||id.startsWith('BTTS_')?'G':id.startsWith('WC_')?'C':id.startsWith('WT_')?'T':null;
+ const da=domain(a),db=domain(b);
+ if(!da&&!db)return false;
+ const family=da||db;
+ if(da&&db&&da!==db)return false;
+ const numeric=id=>marketGroup(id);
+ for(const id of [a,b])if(!domain(id)){
+  const group=numeric(id);
+  if(!group||!group.startsWith(family+':FT:'))return false;
+ }
+ let intersection=0,onlyA=0,onlyB=0;
+ const max=family==='G'?8:16;
+ for(let h=0;h<=max;h++)for(let v=0;v<=max;v++){
+  const row={FTHG:h,FTAG:v,HC:h,AC:v,HY:h,AY:v};
+  const x=settle(row,a),y=settle(row,b);
+  if(x===null||y===null)return false;
+  if(x&&y)intersection++;else if(x)onlyA++;else if(y)onlyB++;
+ }
+ return intersection===0||onlyA===0||onlyB===0;
+}
 function redundantMarkets(seq,markets){
- const seen=new Set();
- for(const i of seq){const group=marketGroup(markets[i].id);if(group&&seen.has(group))return true;if(group)seen.add(group)}
+ const seen=new Set(),special=[],priorIds=[];
+ for(const i of seq){
+  const id=markets[i].id,group=marketGroup(id);
+  if(group&&seen.has(group))return true;
+  if(group)seen.add(group);
+  for(const prior of priorIds)if(semanticConflict(prior,id))return true;
+  if(specialDomain(id)){for(const prior of special)if(specialConflict(prior,id))return true;special.push(id)}
+  priorIds.push(id);
+ }
  return false;
 }
 function select(rows,home,away,cutoff,markets,opts={}){
@@ -89,7 +134,29 @@ function select(rows,home,away,cutoff,markets,opts={}){
     next.push({cand,score:Math.min(...rates),sum:rates[0]+rates[1]});
    }
   }
-  next.sort((a,b)=>b.score-a.score||b.sum-a.sum||a.cand.join(',').localeCompare(b.cand.join(',')));
+  // Price-aware selection: compare admissible alternatives before pruning redundant markets.
+  // Without verified odds, retain historical-frequency ordering; never infer profitability.
+  const price=opts.verifiedOdds||null;
+  const priced=seq=>{
+    if(!price)return null;
+    const ids=seq.map(i=>markets[i].id);
+    const quotes=ids.map(id=>price[id]);
+    if(quotes.some(q=>!q||!Number.isFinite(Number(q.odds))||Number(q.odds)<=1||q.verified!==true))return null;
+    // Joint decimal odds are not the product of correlated legs: require an executable quote.
+    const key=ids.join('|'),joint=opts.verifiedJointOdds?.[key];
+    if(!joint||joint.verified!==true||!Number.isFinite(Number(joint.odds))||Number(joint.odds)<=1)return null;
+    return Number(joint.odds);
+  };
+  const valueOf=c=>{
+    const odds=priced(c.cand);
+    return odds===null?null:c.score*odds-1;
+  };
+  next.sort((a,b)=>{
+    const va=valueOf(a),vb=valueOf(b);
+    if(va!==null&&vb!==null&&va!==vb)return vb-va;
+    // Never rank unpriced alternatives as if they had a verified EV.
+    return b.score-a.score||b.sum-a.sum||a.cand.join(',').localeCompare(b.cand.join(','));
+  });
   if(!next.length)return {status:'NO_ADMISSIBLE_CHAIN',depth,counts,complete_case_counts:complete,catalog_count:markets.length,min_coverage:minCoverage};
   if(depth<3){beam=next.slice(0,width).map(x=>x.cand);continue;}
   chosen=next[0].cand;stageScores.push({depth,score:next[0].score});beam=[chosen];
