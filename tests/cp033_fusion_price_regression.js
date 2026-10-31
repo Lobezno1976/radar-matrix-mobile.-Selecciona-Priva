@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const g={};g.window=g;g.globalThis=g;vm.createContext(g);
+vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../cp033_fusion_price.js'),'utf8'),g);
+const x={core:['A','B','C'],pbase:['A','B','D'],frequencies:{CORE:{hits:77,n:80},PBASE_V2:{hits:78,n:80},FUSION:{hits:77,n:80}}};
+let r=g.RadarCP033FusionPrice.assess(x);assert.equal(r.status,'NO_VERIFIED_JOINT_PRICE');assert.equal(r.bestVerified,null);
+r=g.RadarCP033FusionPrice.assess({...x,quotes:{'A|B|C':{odds:1.05,verified:true,available:true},'A|B|D':{odds:1.08,verified:true,available:true},'A|B|C|D':{odds:1.12,verified:false,available:true}}});
+assert.equal(r.bestVerified,'PBASE_V2');assert.equal(r.variants.FUSION.quote,null);
+r=g.RadarCP033FusionPrice.assess({...x,quotes:{'A|B|C':{odds:1.05,verified:true,available:true},'A|B|D':{odds:1.08,verified:true,available:true},'A|B|C|D':{odds:1.12,verified:true,available:true}}});
+assert.equal(r.bestVerified,'FUSION');
+r=g.RadarCP033FusionPrice.assess({...x,quotes:{'A|B|C|D':{odds:1.4,verified:true,available:false}}});assert.equal(r.status,'NO_VERIFIED_JOINT_PRICE');
+console.log('PASS: missing quotes, unverified quotes, verified comparison, unavailable quotes');
