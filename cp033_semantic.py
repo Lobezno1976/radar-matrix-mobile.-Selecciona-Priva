@@ -15,8 +15,37 @@ def conflict(a,b,settle):
  x,y=a['id'],b['id']
  if x==y:return True
  ax,ay=axis(x),axis(y)
- if not ax or ax!=ay:return False
- if re.search(r'\d+p5$',x) and re.search(r'\d+p5$',y):return True
+ if not ax or not ay or ax[0]!=ay[0]:return False
+ if ':GO' in ax or ':GO' in ay:return ax==ay
+ if re.search(r'\d+p5
+ family=ax[0]
+ if family not in 'GCT' or ':FT:' not in ax or ':FT:' not in ay:return False
+ maximum=12 if family=='G' else 25
+ both=only_x=only_y=0
+ for h in range(maximum+1):
+  for v in range(maximum+1):
+   r=dict(FTHG=h,FTAG=v,HC=h,AC=v,HY=h,AY=v)
+   p,q=settle(r,x),settle(r,y)
+   if p is None or q is None:return False
+   if p and q:both+=1
+   elif p:only_x+=1
+   elif q:only_y+=1
+ return both==0 or only_x==0 or only_y==0
+,x) and re.search(r'\d+p5
+ family=ax[0]
+ if family not in 'GCT' or ':FT:' not in ax:return False
+ maximum=12 if family=='G' else 25
+ both=only_x=only_y=0
+ for h in range(maximum+1):
+  for v in range(maximum+1):
+   r=dict(FTHG=h,FTAG=v,HC=h,AC=v,HY=h,AY=v)
+   p,q=settle(r,x),settle(r,y)
+   if p is None or q is None:return False
+   if p and q:both+=1
+   elif p:only_x+=1
+   elif q:only_y+=1
+ return both==0 or only_x==0 or only_y==0
+,y) and ax==ay:return True
  family=ax[0]
  if family not in 'GCT' or ':FT:' not in ax:return False
  maximum=12 if family=='G' else 25
