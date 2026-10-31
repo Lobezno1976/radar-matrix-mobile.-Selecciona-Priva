@@ -11,12 +11,13 @@ function axis(id){
 function conflict(a,b,settle){
  const x=a.id,y=b.id;if(x===y)return true;
  const ax=axis(x),ay=axis(y);
- if(!ax||ax!==ay)return false;
+ if(!ax||!ay||ax[0]!==ay[0])return false;
+ if(ax.includes(':GO')||ay.includes(':GO'))return ax===ay;
  // Same numerical axis: alternative lines are competing choices, not extra legs.
  const numeric=/\d+p5$/;
- if(numeric.test(x)&&numeric.test(y))return true;
+ if(numeric.test(x)&&numeric.test(y)&&ax===ay)return true;
  // Enumerate full scores in bounded domain to test special/numeric logical relations.
- const family=ax[0];if(!['G','C','T'].includes(family)||!ax.includes(':FT:'))return false;
+ const family=ax[0];if(!['G','C','T'].includes(family)||!ax.includes(':FT:')||!ay.includes(':FT:'))return false;
  const max=family==='G'?12:25;
  let both=0,onlyX=0,onlyY=0;
  for(let h=0;h<=max;h++)for(let v=0;v<=max;v++){
