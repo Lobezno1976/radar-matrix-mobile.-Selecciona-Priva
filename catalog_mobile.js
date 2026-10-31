@@ -39,13 +39,38 @@ function specialConflict(a,b){
  for(let k=0;k<outcomes.length;k++){if(x[k]&&y[k])xy++;else if(x[k])xOnly++;else if(y[k])yOnly++}
  return xy===0||xOnly===0||yOnly===0;
 }
+// Contraste semántico transversal: sólo pares con al menos un mercado especial.
+// Se conservan las alternativas de distinta familia cuando ambas aportan información.
+function semanticConflict(a,b){
+ const domain=id=>id.startsWith('W_')||id.startsWith('BTTS_')?'G':id.startsWith('WC_')?'C':id.startsWith('WT_')?'T':null;
+ const da=domain(a),db=domain(b);
+ if(!da&&!db)return false;
+ const family=da||db;
+ if(da&&db&&da!==db)return false;
+ const numeric=id=>marketGroup(id);
+ for(const id of [a,b])if(!domain(id)){
+  const group=numeric(id);
+  if(!group||!group.startsWith(family+':FT:'))return false;
+ }
+ let intersection=0,onlyA=0,onlyB=0;
+ const max=family==='G'?8:16;
+ for(let h=0;h<=max;h++)for(let v=0;v<=max;v++){
+  const row={FTHG:h,FTAG:v,HC:h,AC:v,HY:h,AY:v};
+  const x=settle(row,a),y=settle(row,b);
+  if(x===null||y===null)return false;
+  if(x&&y)intersection++;else if(x)onlyA++;else if(y)onlyB++;
+ }
+ return intersection===0||onlyA===0||onlyB===0;
+}
 function redundantMarkets(seq,markets){
- const seen=new Set(),special=[];
+ const seen=new Set(),special=[],priorIds=[];
  for(const i of seq){
   const id=markets[i].id,group=marketGroup(id);
   if(group&&seen.has(group))return true;
   if(group)seen.add(group);
+  for(const prior of priorIds)if(semanticConflict(prior,id))return true;
   if(specialDomain(id)){for(const prior of special)if(specialConflict(prior,id))return true;special.push(id)}
+  priorIds.push(id);
  }
  return false;
 }
