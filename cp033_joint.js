@@ -8,7 +8,8 @@ function build(rows,markets,settle,cutoff,options={}){
  const evaluated=markets.map(m=>valid.map(r=>settle(r,m.id)));
  const individual=markets.map((m,i)=>{let n=0,hits=0;for(const x of evaluated[i])if(x!==null&&x!==undefined){n++;if(x===true)hits++;}return {id:m.id,index:i,n,hits,frequency:n?hits/n:null};});
  const eligible=individual.filter(x=>x.n>=minSample).sort((a,b)=>b.frequency-a.frequency||b.n-a.n||a.id.localeCompare(b.id)).slice(0,maxCandidates);
- const conflicts=options.conflicts||((a,b)=>a.group&&b.group&&a.group===b.group);
+ const conflicts=options.conflicts||(g.RadarCP033Semantic?((a,b)=>g.RadarCP033Semantic.conflict(a,b,settle)):null);
+ if(!conflicts)throw Error('CP033 semantic module not loaded');
  const odds=options.verifiedJointOdds||{};
  function evaluate(indices){
   let n=0,hits=0;
