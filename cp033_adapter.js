@@ -1,6 +1,20 @@
 /* CP-033 first canonical baseline adapter. CP-032 remains selectable for rollback. */
 (function(g){'use strict';
-function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();}
+function norm(s){
+ const raw=String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+ const aliases={
+ 'real betis balompie':'betis','real betis':'betis','malaga cf':'malaga','villarreal cf':'villarreal',
+ 'rcd espanyol de barcelona':'espanyol','rcd espanyol':'espanyol','elche cf':'elche','valencia cf':'valencia',
+ 'athletic club':'ath bilbao','athletic bilbao':'ath bilbao','real sociedad de futbol':'sociedad','real sociedad':'sociedad',
+ 'levante ud':'levante','club atletico de madrid':'at madrid','atletico madrid':'at madrid',
+ 'rc deportivo la coruna':'deportivo','deportivo la coruna':'deportivo','ca osasuna':'osasuna',
+ 'fc barcelona':'barcelona','deportivo alaves':'alaves','getafe cf':'getafe','sevilla fc':'sevilla',
+ 'real racing club de santander':'racing santander','racing santander':'racing santander',
+ 'real madrid cf':'real madrid','rayo vallecano de madrid':'rayo vallecano','rc celta de vigo':'celta',
+ 'celta vigo':'celta'
+ };
+ return aliases[raw]||raw;
+}
 function run(rows,home,away,cutoff,markets,opts={}){
  if(norm(home)===norm(away))throw Error('Equipos idénticos');
  const context=rows.filter(r=>String(r.Date)<String(cutoff)&&(norm(r.HomeTeam)===norm(home)||norm(r.AwayTeam)===norm(away)));
@@ -9,7 +23,7 @@ function run(rows,home,away,cutoff,markets,opts={}){
   maxCandidates:opts.maxCandidates??40,beamWidth:opts.beamWidth??100,
   verifiedJointOdds:opts.verifiedJointOdds||{}
  });
- if(result.status!=='EXPERIMENTAL_JOINT_SEARCH')return {status:result.status,version:'CP033_CANONICAL_BASELINE_1',context_rows:context.length,details:result};
+ if(result.status!=='EXPERIMENTAL_JOINT_SEARCH')return {status:result.status,version:'CP033_CANONICAL_BASELINE_1',context_rows:context.length,home_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.HomeTeam)===norm(home)).length,away_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.AwayTeam)===norm(away)).length,details:result};
  const index=new Map(markets.map(m=>[m.id,m]));
  const variants=[result.core,...result.sat].map((s,i)=>({
   name:['CORE','SAT1','SAT2','SAT3'][i],legs:s.ids.map(id=>index.get(id)),
