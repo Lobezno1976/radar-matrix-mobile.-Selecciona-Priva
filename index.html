@@ -81,7 +81,18 @@ async function renderOddsComparison(items){
  body.appendChild(row);count++;
  }}
  table.appendChild(body);root.appendChild(table);
- if(!count){const p=document.createElement('p');p.textContent='No hay coincidencias exactas de mercados cotizados para los partidos seleccionados. No se inventan equivalencias.';root.appendChild(p)}
+ if(!count){const p=document.createElement('p');p.textContent='No hay propuestas CORE/SAT cotizables. Se muestran a continuación los partidos disponibles en la captura, independientemente del motor.';root.appendChild(p)}
+ const preview=document.createElement('div');preview.className='matrix-scroll';
+ const t=document.createElement('table'),hd=document.createElement('tr');
+ for(const s of ['Partido API','Operador','1','X','2']){const th=document.createElement('th');th.textContent=s;hd.appendChild(th)}
+ const thd=document.createElement('thead');thd.appendChild(hd);t.appendChild(thd);
+ const tb=document.createElement('tbody');
+ for(const event of data.events||[]){const offers=(event.bookmakers||[]).filter(b=>b.markets?.some(m=>m.key==='h2h'));if(!offers.length)continue;
+ const preferred=offers.find(b=>b.key==='bet365')||offers.find(b=>b.key==='pinnacle')||offers[0];
+ const m=preferred.markets.find(x=>x.key==='h2h');
+ const price=name=>{const o=m.outcomes.find(x=>x.name===name);return o&&Number(o.price)>1?Number(o.price).toFixed(2):'—'};
+ const tr=document.createElement('tr');for(const s of [event.home_team+' – '+event.away_team,preferred.title,price(event.home_team),price('Draw'),price(event.away_team)]){const td=document.createElement('td');td.textContent=s;tr.appendChild(td)}tb.appendChild(tr)}
+ t.appendChild(tb);preview.appendChild(t);root.appendChild(preview);
 }
 function renderPriceRanking(items){
  const root=$('priceRanking');root.replaceChildren();
@@ -132,11 +143,11 @@ $('runStatus').textContent='Motor '+$('engine').value+' · 139 mercados · hist�
 for(const [home,away] of selectedMatches){
 try{
  const r=$('engine').value==='CP033'?RadarCP033Adapter.run(merged.rows,home,away,$('cutoff').value,catalog):RadarMobileCatalog.select(merged.rows,home,away,$('cutoff').value,catalog,{useWeights:true});
- summaryRows.push(r.variants?{match:home+' – '+away,variants:r.variants}:{match:home+' – '+away,status:r.status});
+ summaryRows.push(r.variants?{match:home+' – '+away,variants:r.variants}:{match:home+' – '+away,status:r.status,context_rows:r.context_rows,details:r.details});
 }catch(e){summaryRows.push({match:home+' – '+away,status:'Error de cálculo: '+e.message})}
 await new Promise(resolve=>setTimeout(resolve,0))}
-renderMatrixSummary(summaryRows);renderPriceRanking(summaryRows);await renderOddsComparison(summaryRows);$('runStatus').textContent+=' · Cálculo terminado. Revisar muestras y filas.'
+renderMatrixSummary(summaryRows);renderPriceRanking(summaryRows);await renderOddsComparison(summaryRows);const failed=summaryRows.filter(x=>!x.variants);$('runStatus').textContent+=failed.length?' · ATENCIÓN: '+failed.length+'/'+summaryRows.length+' partidos sin propuestas. Diagnóstico: '+failed.slice(0,5).map(x=>x.match+': '+(x.status||'sin estado')+' (filas de contexto '+(x.context_rows??'?')+', profundidad '+(x.details?.depth??'?')+')').join('; '):' · '+summaryRows.length+' partidos con propuestas calculadas.'
 }catch(e){$('runStatus').textContent='ERROR: '+e.message}finally{$('run').disabled=false}};
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=19',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js?v=20',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
 if(location.protocol.startsWith('http'))refresh();
 </script><script src="./radar_bridge_v14.js?v=14"></script></body></html>
