@@ -17,5 +17,26 @@ function assess({core,pbase,union,frequencies={},quotes={},maxLegs=6}){
  candidates.sort((a,b)=>b[1].retrospectiveEV-a[1].retrospectiveEV||a[1].legs.length-b[1].legs.length||a[0].localeCompare(b[0]));
  result.bestVerified=candidates[0][0];result.reason='Highest retrospective EV among verified available quotes; not a forecast or staking recommendation';return result;
 }
-g.RadarCP033FusionPrice={assess};
+function rank({proposals=[],quotes={},minSample=20}={}) {
+ const seen=new Set(),out=[];
+ for(const proposal of proposals){
+  const legs=ids(proposal.legs);
+  if(!legs.length)continue;
+  const key=legs.join('|');
+  if(seen.has(key))continue;seen.add(key);
+  const hits=proposal.hits,n=proposal.n;
+  const valid=Number.isInteger(hits)&&Number.isInteger(n)&&n>=minSample&&hits>=0&&hits<=n;
+  const f=valid?hits/n:null,q=quote(quotes[key]);
+  const ev=f!==null&&q!==null?f*q-1:null;
+  out.push({name:proposal.name||'PROPUESTA',legs,hits:valid?hits:null,n:valid?n:null,frequency:f,breakeven:f>0?1/f:null,verifiedJointOdds:q,retrospectiveEV:ev,status:!valid?'INSUFFICIENT_HISTORY':q===null?'PRICE_NOT_VERIFIED':'VERIFIED_HISTORICAL_EV'});
+ }
+ out.sort((a,b)=>{
+  const av=a.retrospectiveEV,bv=b.retrospectiveEV;
+  if(av!==null&&bv!==null)return bv-av||b.frequency-a.frequency;
+  if(av!==null)return -1;if(bv!==null)return 1;
+  return (b.frequency??-1)-(a.frequency??-1)||a.name.localeCompare(b.name);
+ });
+ return {status:out.some(x=>x.retrospectiveEV!==null)?'VERIFIED_PRICE_RANKING':'HISTORICAL_ONLY',proposals:out,priced:out.filter(x=>x.retrospectiveEV!==null).length};
+}
+g.RadarCP033FusionPrice={assess,rank};
 })(typeof window!=='undefined'?window:globalThis);
