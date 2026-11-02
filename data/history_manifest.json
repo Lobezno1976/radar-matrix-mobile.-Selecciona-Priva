@@ -1,0 +1,46 @@
+{
+  "schema": "radar-shared-history/1",
+  "status": "AWAITING_VERIFIED_MASTER_CSV",
+  "competition": "LaLiga",
+  "season_scope": "2006/07 onward",
+  "canonical_engine": "CP033_CANONICAL_BASELINE_1",
+  "catalog_expected": 139,
+  "master_path": "data/laliga_master.csv",
+  "required_columns": [
+    "Date",
+    "HomeTeam",
+    "AwayTeam",
+    "FTHG",
+    "FTAG"
+  ],
+  "optional_stat_columns": [
+    "HTHG",
+    "HTAG",
+    "HS",
+    "AS",
+    "HST",
+    "AST",
+    "HF",
+    "AF",
+    "HC",
+    "AC",
+    "HY",
+    "AY",
+    "HR",
+    "AR"
+  ],
+  "validation": {
+    "unique_key": [
+      "Date",
+      "HomeTeam",
+      "AwayTeam"
+    ],
+    "missing_statistics": "null_not_zero",
+    "future_fixtures": "exclude_from_results",
+    "duplicates": "reject_or_reconcile",
+    "date_cutoff": "exclusive"
+  },
+  "last_verified": null,
+  "match_count": null,
+  "note": "Manifest only. No historical match rows have been published. Do not infer dataset completeness from this manifest."
+}
