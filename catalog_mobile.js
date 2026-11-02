@@ -116,9 +116,9 @@ function select(rows,home,away,cutoff,markets,opts={}){
    });
  };
  const admissible=seq=>{const tr=evalSeq(seq,training),te=evalSeq(seq,holdout);return tr.every((v,j)=>v.n>=minTrain&&v.n>=Math.ceil(available[j].train*minCoverage)&&te[j].n>=minTest&&te[j].n>=Math.ceil(available[j].holdout*minCoverage));};
- const policy=g.RadarCP033Joint&&g.RadarCP033Joint.preselect;
- if(typeof policy!=='function')throw Error('Missing shared CP033 preselection');
- const allowedIds=new Set(policy(split.flatMap(parts=>parts[0]),markets,settle,cutoff,{minTheoreticalOdds:opts.minTheoreticalOdds??1.125,lineRetention:opts.lineRetention??0.70,maxCandidates:opts.maxCandidates??40}).map(x=>x.id));
+ const sharedPreselect=g.RadarCP033Joint&&g.RadarCP033Joint.preselect;
+ if(typeof sharedPreselect!=='function')throw Error('Missing shared CP033 preselection');
+ const allowedIds=new Set(sharedPreselect(split.flatMap(parts=>parts[0]),markets,settle,cutoff,{minTheoreticalOdds:opts.minTheoreticalOdds??1.125,lineRetention:opts.lineRetention??0.70,maxCandidates:opts.maxCandidates??40}).map(x=>x.id));
  let beam=[[]],examined=0,chosen=null,stageScores=[];
  for(let depth=1;depth<=3;depth++){
   const next=[];
