@@ -66,7 +66,7 @@ function build(rows,markets,settle,cutoff,options={}){
   return b.frequency-a.frequency||b.n-a.n||a.ids.join('|').localeCompare(b.ids.join('|'));
  }
  let beam=[{indices:[],ids:[],n:0,hits:0,frequency:1,ev:null}],stages=[],examined=0;
- const depthLimit=coreSize+satCount;
+ const depthLimit=coreSize;
  for(let depth=1;depth<=depthLimit;depth++){
   const next=[];
   for(const parent of beam)for(const candidate of eligible){
@@ -86,8 +86,32 @@ function build(rows,markets,settle,cutoff,options={}){
   const best=ranked[0];stages.push({depth,...best,indices:undefined});
   beam=depth>=coreSize?[best]:ranked.slice(0,beamWidth);
  }
- const core=stages[coreSize-1],sat=stages.slice(coreSize,coreSize+satCount);
- return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',core,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
+ const core=stages[coreSize-1],sat=[];
+ // SAT branches are independent extensions of the same frozen CORE.
+ if(core&&satCount){
+  const coreIds=new Set(core.ids),coreIndices=core.ids.map(id=>markets.findIndex(m=>m.id===id));
+  const extensions=[];
+  for(const candidate of eligible){
+   if(coreIds.has(candidate.id))continue;
+   if(coreIndices.some(j=>conflicts(markets[j],markets[candidate.index])))continue;
+   if(options.diversifyFamilies===true){
+    const counts={};for(const j of coreIndices){const f=family(markets[j].id);counts[f]=(counts[f]||0)+1;}
+    if((counts[family(candidate.id)]||0)>=2)continue;
+   }
+   const result=evaluate([...coreIndices,candidate.index]);examined++;
+   if(result.n>=minSample)extensions.push(result);
+  }
+  extensions.sort(cmp);
+  const seenFamilies=new Set();
+  for(const ext of extensions){
+   const extra=ext.ids.find(id=>!coreIds.has(id)),f=family(extra);
+   if(seenFamilies.has(f))continue;
+   sat.push(ext);seenFamilies.add(f);
+   if(sat.length===satCount)break;
+  }
+ }
+
+ return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',satStructure:'INDEPENDENT_CORE_PLUS_ONE',core,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
 }
 g.RadarCP033Joint={build};
 })(typeof window!=='undefined'?window:globalThis);
