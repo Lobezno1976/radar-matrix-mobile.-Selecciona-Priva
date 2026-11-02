@@ -10,15 +10,40 @@ function build(rows,markets,settle,cutoff,options={}){
  const rankedAll=individual.filter(x=>x.n>=minSample).sort((a,b)=>b.frequency-a.frequency||b.n-a.n||a.id.localeCompare(b.id));
  const family=id=>id.startsWith('BTTS')?'BTTS':id.startsWith('W_')?'RESULTADO':id.startsWith('WC_')?'CORNERS_RESULTADO':id.startsWith('WT_')?'TARJETAS_RESULTADO':id.startsWith('GO')?'GOLES_PERIODOS':({S:'TIROS_PUERTA',R:'REMATES',F:'FALTAS',C:'CORNERS',T:'TARJETAS',G:'GOLES'}[id[0]]||'OTROS');
  const families={};for(const x of individual){const f=family(x.id),v=families[f]??={total:0,eligible:0,withoutData:0};v.total++;if(x.n>=minSample)v.eligible++;if(!x.n)v.withoutData++}
+ // Compare neighboring thresholds BEFORE selecting the candidate pool.
+ // Over: +1/+2; under: -1/-2. Never add both as separate legs.
+ const parseLine=id=>{const m=/^([A-Z]+)(\\d+)p5$/.exec(id);return m?{prefix:m[1],step:Number(m[2]),over:m[1].endsWith('G')}:null};
+ const byId=new Map(rankedAll.map(x=>[x.id,x]));
+ const axes=new Map();
+ for(const x of rankedAll){const p=parseLine(x.id);if(!p)continue;const axis=p.prefix.replace(/[GL]$/,'');const key=axis+':'+(p.prefix.length===2?'total':p.prefix.includes('H')?'home':'away');if(!axes.has(key))axes.set(key,[]);axes.get(key).push({...x,line:p});}
+ const minimumRetention=options.lineRetention??0.70;
+ const selected=new Map(),lineComparisons=[];
+ for(const [axis,items] of axes){
+   const ranked=items.slice().sort((a,b)=>b.frequency-a.frequency||a.id.localeCompare(b.id));
+   const baseline=ranked[0];if(!baseline)continue;
+   const p=baseline.line;const tests=[baseline];
+   for(const delta of [1,2]){
+     const id=p.prefix+(p.step+(p.over?delta:-delta))+'p5';
+     const candidate=byId.get(id);
+     if(candidate)tests.push({...candidate,line:parseLine(id)});
+   }
+   const admissible=tests.filter(x=>x.n>=minSample&&x.frequency>=baseline.frequency*minimumRetention);
+   const winner=admissible.sort((a,b)=>Math.abs(b.line.step-p.step)-Math.abs(a.line.step-p.step)||b.frequency-a.frequency)[0]||baseline;
+   selected.set(winner.id,winner);
+   lineComparisons.push({axis,baseline:baseline.id,selected:winner.id,options:tests.map(x=>({id:x.id,n:x.n,frequency:x.frequency})),retention:minimumRetention});
+ }
+ // Keep all special markets, plus the selected threshold for each numerical axis.
+ for(const x of rankedAll)if(!parseLine(x.id))selected.set(x.id,x);
+ const linePool=[...selected.values()].sort((a,b)=>b.frequency-a.frequency||b.n-a.n||a.id.localeCompare(b.id));
  let eligible;
  if(options.diversifyFamilies===true){
   const perFamily=new Map(),pool=[];
-  for(const x of rankedAll){const f=family(x.id),used=perFamily.get(f)||0;if(used>=Math.max(2,Math.ceil(maxCandidates/10)))continue;pool.push(x);perFamily.set(f,used+1)}
-  const chosen=new Set(pool.map(x=>x.id));
+  for(const x of linePool){const f=family(x.id),used=perFamily.get(f)||0;if(used>=Math.max(2,Math.ceil(maxCandidates/10)))continue;pool.push(x);perFamily.set(f,used+1)}
   eligible=pool.slice(0,maxCandidates);
-  for(const x of rankedAll){if(eligible.length>=maxCandidates)break;if(!chosen.has(x.id)){eligible.push(x);chosen.add(x.id)}}
- }else eligible=rankedAll.slice(0,maxCandidates);
- const audit={catalogCount:markets.length,evaluatedCount:individual.length,eligibleCount:rankedAll.length,candidateCount:eligible.length,excludedBySample:individual.length-rankedAll.length,excludedByCandidateLimit:rankedAll.length-eligible.length,families,diversified:options.diversifyFamilies===true,diversityRule:options.diversifyFamilies===true?'CORE_ONE_PER_FAMILY_AND_MAX_TWO_PER_CHAIN':'NONE'};
+  const chosen=new Set(eligible.map(x=>x.id));
+  for(const x of linePool){if(eligible.length>=maxCandidates)break;if(!chosen.has(x.id)){eligible.push(x);chosen.add(x.id)}}
+ }else eligible=linePool.slice(0,maxCandidates);
+ const audit={catalogCount:markets.length,evaluatedCount:individual.length,eligibleCount:rankedAll.length,candidateCount:eligible.length,excludedBySample:individual.length-rankedAll.length,excludedByCandidateLimit:rankedAll.length-eligible.length,families,lineSelection:'NEIGHBOR_PLUS_MINUS_1_2_BEFORE_BEAM',lineRetention:minimumRetention,lineComparisons,diversified:options.diversifyFamilies===true,diversityRule:options.diversifyFamilies===true?'CORE_ONE_PER_FAMILY_AND_MAX_TWO_PER_CHAIN':'NONE'};
  const conflicts=options.conflicts||(g.RadarCP033Semantic?((a,b)=>g.RadarCP033Semantic.conflict(a,b,settle)):null);
  if(!conflicts)throw Error('CP033 semantic module not loaded');
  const odds=options.verifiedJointOdds||{};
