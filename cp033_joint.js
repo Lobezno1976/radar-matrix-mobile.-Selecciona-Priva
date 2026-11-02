@@ -18,7 +18,7 @@ function build(rows,markets,settle,cutoff,options={}){
   eligible=pool.slice(0,maxCandidates);
   for(const x of rankedAll){if(eligible.length>=maxCandidates)break;if(!chosen.has(x.id)){eligible.push(x);chosen.add(x.id)}}
  }else eligible=rankedAll.slice(0,maxCandidates);
- const audit={catalogCount:markets.length,evaluatedCount:individual.length,eligibleCount:rankedAll.length,candidateCount:eligible.length,excludedBySample:individual.length-rankedAll.length,excludedByCandidateLimit:rankedAll.length-eligible.length,families,diversified:options.diversifyFamilies===true};
+ const audit={catalogCount:markets.length,evaluatedCount:individual.length,eligibleCount:rankedAll.length,candidateCount:eligible.length,excludedBySample:individual.length-rankedAll.length,excludedByCandidateLimit:rankedAll.length-eligible.length,families,diversified:options.diversifyFamilies===true,diversityRule:options.diversifyFamilies===true?'CORE_ONE_PER_FAMILY_AND_MAX_TWO_PER_CHAIN':'NONE'};
  const conflicts=options.conflicts||(g.RadarCP033Semantic?((a,b)=>g.RadarCP033Semantic.conflict(a,b,settle)):null);
  if(!conflicts)throw Error('CP033 semantic module not loaded');
  const odds=options.verifiedJointOdds||{};
@@ -46,6 +46,7 @@ function build(rows,markets,settle,cutoff,options={}){
    const i=candidate.index;
    if(parent.indices.includes(i))continue;
    if(parent.indices.some(j=>conflicts(markets[j],markets[i])))continue;
+   if(options.diversifyFamilies===true){const counts={};for(const j of parent.indices){const f=family(markets[j].id);counts[f]=(counts[f]||0)+1;}const f=family(markets[i].id);if((counts[f]||0)>=1&&depth<=coreSize)continue;if((counts[f]||0)>=2)continue;}
    const indices=[...parent.indices,i].sort((a,b)=>markets[a].id.localeCompare(markets[b].id));
    const result=evaluate(indices);examined++;
    if(result.n<minSample)continue;
