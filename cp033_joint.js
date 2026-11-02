@@ -113,5 +113,13 @@ function build(rows,markets,settle,cutoff,options={}){
 
  return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',satStructure:'INDEPENDENT_CORE_PLUS_ONE',core,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
 }
-g.RadarCP033Joint={build};
+function preselect(rows,markets,settle,cutoff,options={}){
+ const valid=rows.filter(r=>String(r.Date)<String(cutoff)),minimum=options.minTheoreticalOdds??1.125,retention=options.lineRetention??0.70;
+ const eligible=markets.map(m=>{let n=0,hits=0;for(const r of valid){const v=settle(r,m.id);if(v===null||v===undefined)continue;n++;if(v)hits++;}return {id:m.id,n,frequency:n?hits/n:0};}).filter(x=>x.n>=(options.minSample??20)&&x.frequency>0&&1/x.frequency+1e-12>=minimum);
+ const byId=new Map(eligible.map(x=>[x.id,x])),groups=new Map(),selected=[];
+ for(const x of eligible){const m=/^([A-Z]+)(\d+)p5$/.exec(x.id);if(!m){selected.push(x);continue}const key=m[1];if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x)}
+ for(const [prefix,items] of groups){items.sort((a,b)=>b.frequency-a.frequency);const base=items[0],p=/^(.*?)(\d+)p5$/.exec(base.id),step=Number(p[2]),over=prefix.endsWith('G');const candidates=[base,...[1,2].map(d=>byId.get(prefix+(step+(over?d:-d))+'p5')).filter(Boolean)];const acceptable=candidates.filter(x=>x.frequency>=base.frequency*retention);selected.push(acceptable[acceptable.length-1]||base)}
+ return selected.sort((a,b)=>b.frequency-a.frequency).slice(0,options.maxCandidates??40);
+}
+g.RadarCP033Joint={build,preselect};
 })(typeof window!=='undefined'?window:globalThis);
