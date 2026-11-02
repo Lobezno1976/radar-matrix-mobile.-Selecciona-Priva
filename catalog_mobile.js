@@ -116,12 +116,15 @@ function select(rows,home,away,cutoff,markets,opts={}){
    });
  };
  const admissible=seq=>{const tr=evalSeq(seq,training),te=evalSeq(seq,holdout);return tr.every((v,j)=>v.n>=minTrain&&v.n>=Math.ceil(available[j].train*minCoverage)&&te[j].n>=minTest&&te[j].n>=Math.ceil(available[j].holdout*minCoverage));};
+ const policy=g.RadarCP033Joint&&g.RadarCP033Joint.preselect;
+ if(typeof policy!=='function')throw Error('Missing shared CP033 preselection');
+ const allowedIds=new Set(policy(split.flatMap(parts=>parts[0]),markets,settle,cutoff,{minTheoreticalOdds:opts.minTheoreticalOdds??1.125,lineRetention:opts.lineRetention??0.70,maxCandidates:opts.maxCandidates??40}).map(x=>x.id));
  let beam=[[]],examined=0,chosen=null,stageScores=[];
- for(let depth=1;depth<=6;depth++){
+ for(let depth=1;depth<=3;depth++){
   const next=[];
   for(const seq of beam){
    for(let i=0;i<markets.length;i++){
-    if(seq.includes(i))continue;
+    if(!allowedIds.has(markets[i].id)||seq.includes(i))continue;
     const cand=[...seq,i];if(redundantMarkets(cand,markets)||!admissible(cand))continue;
     const v=evalSeq(cand,training);
     // Comparar la reducción de aciertos sobre EXACTAMENTE la misma cohorte evaluable.
@@ -161,8 +164,24 @@ function select(rows,home,away,cutoff,markets,opts={}){
   if(depth<3){beam=next.slice(0,width).map(x=>x.cand);continue;}
   chosen=next[0].cand;stageScores.push({depth,score:next[0].score});beam=[chosen];
  }
- const variants=[3,4,5,6].map((n,i)=>{const ids=chosen.slice(0,n);return {name:['CORE','SAT1','SAT2','SAT3'][i],legs:ids.map(j=>markets[j]),train_by_context:evalSeq(ids,training),holdout_by_context:evalSeq(ids,holdout)};});
- return {status:'MOBILE_139_BEAM_SHADOW_V11',variants,counts,complete_case_counts:complete,catalog_count:markets.length,extensions_examined:examined,nested:true,calibrated:false,match_joint_probability:null,global_optimum_proven:false,stageScores,complete_case_139:false,min_coverage:minCoverage,weighting_applied:weighted};
+ const core=chosen.slice(),sat=[],candidates=[];
+ for(let i=0;i<markets.length;i++){
+  if(!allowedIds.has(markets[i].id)||core.includes(i))continue;
+  const seq=[...core,i];if(redundantMarkets(seq,markets)||!admissible(seq))continue;
+  const rates=rankRates(seq);candidates.push({seq,score:Math.min(...rates),sum:rates[0]+rates[1]});
+ }
+ candidates.sort((a,b)=>b.score-a.score||b.sum-a.sum);
+ const selectedGroups=new Set();
+ for(const candidate of candidates){
+  const extra=markets[candidate.seq[candidate.seq.length-1]].id;
+  const group=marketGroup(extra)||specialDomain(extra)||extra;
+  if(selectedGroups.has(group))continue;
+  sat.push(candidate.seq);selectedGroups.add(group);
+  if(sat.length===3)break;
+ }
+ const variants=[core,...sat].map((ids,i)=>({name:['CORE','SAT1','SAT2','SAT3'][i],legs:ids.map(j=>markets[j]),train_by_context:evalSeq(ids,training),holdout_by_context:evalSeq(ids,holdout)}));
+
+ return {status:'MOBILE_139_BEAM_SHADOW_V11',variants,counts,complete_case_counts:complete,catalog_count:markets.length,extensions_examined:examined,nested:false,calibrated:false,match_joint_probability:null,global_optimum_proven:false,stageScores,complete_case_139:false,min_coverage:minCoverage,weighting_applied:weighted};
 }
 async function loadCatalog(){let r=await fetch('./catalog139.json');if(!r.ok)throw Error('Catálogo HTTP '+r.status);return r.json()}
 g.RadarMobileCatalog={settle,merge,select,loadCatalog,required,marketGroup,redundantMarkets};})(typeof window!=='undefined'?window:globalThis);
