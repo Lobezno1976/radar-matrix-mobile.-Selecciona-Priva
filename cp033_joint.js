@@ -7,7 +7,18 @@ function build(rows,markets,settle,cutoff,options={}){
  const valid=rows.filter(r=>String(r.Date)<String(cutoff));
  const evaluated=markets.map(m=>valid.map(r=>settle(r,m.id)));
  const individual=markets.map((m,i)=>{let n=0,hits=0;for(const x of evaluated[i])if(x!==null&&x!==undefined){n++;if(x===true)hits++;}return {id:m.id,index:i,n,hits,frequency:n?hits/n:null};});
- const eligible=individual.filter(x=>x.n>=minSample).sort((a,b)=>b.frequency-a.frequency||b.n-a.n||a.id.localeCompare(b.id)).slice(0,maxCandidates);
+ const rankedAll=individual.filter(x=>x.n>=minSample).sort((a,b)=>b.frequency-a.frequency||b.n-a.n||a.id.localeCompare(b.id));
+ const family=id=>id.startsWith('BTTS')?'BTTS':id.startsWith('W_')?'RESULTADO':id.startsWith('WC_')?'CORNERS_RESULTADO':id.startsWith('WT_')?'TARJETAS_RESULTADO':id.startsWith('GO')?'GOLES_PERIODOS':({S:'TIROS_PUERTA',R:'REMATES',F:'FALTAS',C:'CORNERS',T:'TARJETAS',G:'GOLES'}[id[0]]||'OTROS');
+ const families={};for(const x of individual){const f=family(x.id),v=families[f]??={total:0,eligible:0,withoutData:0};v.total++;if(x.n>=minSample)v.eligible++;if(!x.n)v.withoutData++}
+ let eligible;
+ if(options.diversifyFamilies===true){
+  const perFamily=new Map(),pool=[];
+  for(const x of rankedAll){const f=family(x.id),used=perFamily.get(f)||0;if(used>=Math.max(2,Math.ceil(maxCandidates/10)))continue;pool.push(x);perFamily.set(f,used+1)}
+  const chosen=new Set(pool.map(x=>x.id));
+  eligible=pool.slice(0,maxCandidates);
+  for(const x of rankedAll){if(eligible.length>=maxCandidates)break;if(!chosen.has(x.id)){eligible.push(x);chosen.add(x.id)}}
+ }else eligible=rankedAll.slice(0,maxCandidates);
+ const audit={catalogCount:markets.length,evaluatedCount:individual.length,eligibleCount:rankedAll.length,candidateCount:eligible.length,excludedBySample:individual.length-rankedAll.length,excludedByCandidateLimit:rankedAll.length-eligible.length,families,diversified:options.diversifyFamilies===true};
  const conflicts=options.conflicts||(g.RadarCP033Semantic?((a,b)=>g.RadarCP033Semantic.conflict(a,b,settle)):null);
  if(!conflicts)throw Error('CP033 semantic module not loaded');
  const odds=options.verifiedJointOdds||{};
@@ -43,12 +54,12 @@ function build(rows,markets,settle,cutoff,options={}){
   const unique=new Map();
   for(const x of next){const key=x.ids.join('|');const prev=unique.get(key);if(!prev||cmp(x,prev)<0)unique.set(key,x);}
   const ranked=[...unique.values()].sort(cmp);
-  if(!ranked.length)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined};
+  if(!ranked.length)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined,audit};
   const best=ranked[0];stages.push({depth,...best,indices:undefined});
   beam=depth>=coreSize?[best]:ranked.slice(0,beamWidth);
  }
  const core=stages[coreSize-1],sat=stages.slice(coreSize,coreSize+satCount);
- return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',core,sat,stages,examined,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
+ return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',core,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
 }
 g.RadarCP033Joint={build};
 })(typeof window!=='undefined'?window:globalThis);
