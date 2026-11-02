@@ -21,7 +21,8 @@ function run(rows,home,away,cutoff,markets,opts={}){
  const result=g.RadarCP033Joint.build(context,markets,g.RadarMobileCatalog.settle,cutoff,{
   minSample:opts.minSample??20,coreSize:opts.coreSize??3,satCount:opts.satCount??3,
   maxCandidates:opts.maxCandidates??40,beamWidth:opts.beamWidth??100,
-  verifiedJointOdds:opts.verifiedJointOdds||{},diversifyFamilies:opts.diversifyFamilies===true
+  verifiedJointOdds:opts.verifiedJointOdds||{},diversifyFamilies:opts.diversifyFamilies!==false,
+  minTheoreticalOdds:opts.minTheoreticalOdds??1.125,lineRetention:opts.lineRetention??0.70
  });
  if(result.status!=='EXPERIMENTAL_JOINT_SEARCH')return {status:result.status,version:'CP033_CANONICAL_BASELINE_1',context_rows:context.length,home_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.HomeTeam)===norm(home)).length,away_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.AwayTeam)===norm(away)).length,details:result,audit:result.audit};
  const index=new Map(markets.map(m=>[m.id,m]));
