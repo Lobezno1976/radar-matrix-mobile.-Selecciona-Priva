@@ -36,5 +36,5 @@ function run(rows,home,away,cutoff,markets,opts={}){
   historical_only:true,calibrated:false,global_optimum_proven:false,
   economic_validation:false,context_policy:'home_local_or_away_visitor_union'};
 }
-g.RadarCP033Adapter={run};
+g.RadarCP033Adapter={run,normalize:norm};
 })(typeof window!=='undefined'?window:globalThis);
