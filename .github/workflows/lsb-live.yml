@@ -1,0 +1,23 @@
+name: LSB-LIVE adapter tests
+on:
+  push:
+    paths:
+      - 'lsb_telegram_adapter.js'
+      - 'lsb_live.html'
+      - 'tests/lsb_telegram_adapter.test.js'
+      - '.github/workflows/lsb-live.yml'
+  pull_request:
+    paths:
+      - 'lsb_telegram_adapter.js'
+      - 'lsb_live.html'
+      - 'tests/lsb_telegram_adapter.test.js'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check lsb_telegram_adapter.js
+      - run: node tests/lsb_telegram_adapter.test.js
