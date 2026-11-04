@@ -4,6 +4,8 @@ on:
     paths:
       - 'lsb_telegram_adapter.js'
       - 'lsb_live.html'
+      - 'lsb_event_tracker.js'
+      - 'tests/lsb_event_tracker.test.js'
       - 'tests/lsb_telegram_adapter.test.js'
       - '.github/workflows/lsb-live.yml'
   pull_request:
@@ -20,4 +22,6 @@ jobs:
         with:
           node-version: '22'
       - run: node --check lsb_telegram_adapter.js
+      - run: node --check lsb_event_tracker.js
       - run: node tests/lsb_telegram_adapter.test.js
+      - run: node tests/lsb_event_tracker.test.js
