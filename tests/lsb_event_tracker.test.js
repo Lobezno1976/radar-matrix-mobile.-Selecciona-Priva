@@ -8,7 +8,9 @@ const final={match:signal.match,time:'2026-11-05T00:55',minute:90,type:'final',s
 a=T.evaluate(signal,[goal,final]);assert.equal(a.status,'win');
 a=T.evaluate(signal,[goal,{...final,score:'2-1'}]);assert.equal(a.status,'loss');
 a=T.evaluate({...signal,market:'home_remaining_over_0_5'},[goal]);assert.equal(a.remaining,0);assert.equal(a.status,'live');
-a=T.evaluate({...signal,score:'2-1',time:'2026-11-05T00:06'},[goal,final]);assert.equal(a.counted,0);assert.equal(a.status,'win');
+a=T.evaluate({...signal,score:'2-1',time:'2026-11-05T00:06'},[goal,final]);assert.equal(a.counted,0);assert.equal(a.status,'loss');
 a=T.evaluate(signal,[goal,{...final,score:'1-1'}]);assert.equal(a.status,'conflict');
 assert.equal(T.validateEvent(goal),true);
 console.log('LSB event tracker tests passed');
+
+a=T.evaluate({...signal,match:'Nacional Potosi - Oriente Petrolero'},[goal]);assert.equal(a.remaining,1);
