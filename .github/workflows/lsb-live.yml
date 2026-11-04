@@ -11,8 +11,10 @@ on:
   pull_request:
     paths:
       - 'lsb_telegram_adapter.js'
+      - 'lsb_event_tracker.js'
       - 'lsb_live.html'
       - 'tests/lsb_telegram_adapter.test.js'
+      - 'tests/lsb_event_tracker.test.js'
 jobs:
   test:
     runs-on: ubuntu-latest
