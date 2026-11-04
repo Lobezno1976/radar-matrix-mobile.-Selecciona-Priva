@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RADAR CP-033 · LSB-LIVE</title><style>
+body{background:#0c1220;color:#edf4ff;font:15px system-ui;margin:0 auto;max-width:1050px;padding:18px}a{color:#a8d3ff}
+section{background:#18263c;border:1px solid #405775;border-radius:12px;padding:16px;margin:14px 0}
+input,select,button,textarea{font:inherit;padding:9px;border-radius:7px;background:#0c1220;color:white;border:1px solid #7592b2;max-width:100%;box-sizing:border-box}
+button{background:#345c88;cursor:pointer}label{display:block;margin:10px 0}table{border-collapse:collapse;width:100%;min-width:800px}th,td{padding:8px;border-bottom:1px solid #405775;text-align:left} .scroll{overflow:auto}
+small,.muted{color:#b9cce0}.warn{color:#ffce89}.ok{color:#8ee2b2}
+</style></head><body>
+<h1>LSB-LIVE · RADAR Matrix CP-033</h1><p><a href="./index.html">← Volver a RADAR</a> · Módulo independiente: no modifica CP-033 ni ejecuta apuestas.</p>
+<section><h2>1. Registrar señal LIVE</h2>
+<form id="form"><label>Partido (identificador estable) <input name="match" required placeholder="Local - Visitante"></label>
+<label>Fecha y hora local de la señal <input type="datetime-local" name="time" required></label>
+<label>Minuto <input type="number" name="minute" min="0" max="130" required></label>
+<label>Marcador al emitir <input name="score" placeholder="1-1" pattern="[0-9]+-[0-9]+" required></label>
+<label>Mercado <select name="market"><option value="remaining_over_0_5">+0,5 goles restantes (cualquiera)</option><option value="home_remaining_over_0_5">+0,5 goles restantes local</option><option value="remaining_over_1_5">+1,5 goles restantes (cualquiera)</option></select></label>
+<label>Cuota decimal <input name="odds" type="number" min="1.01" max="1000" step=".01" required></label>
+<label>Stake € <input name="stake" type="number" min="0" step=".01" value="0" required></label>
+<label>Marcador final (opcional) <input name="final" placeholder="3-2" pattern="[0-9]+-[0-9]+"></label>
+<button>Guardar señal</button></form><p id="notice" role="status"></p></section>
+<section><h2>2. Riesgo y resultados</h2><label>Bankroll de referencia (€) <input id="bankroll" type="number" min=".01" step=".01" value="1000"></label>
+<p id="metrics"></p><p class="warn">Las señales del mismo partido están correlacionadas. Las cifras no constituyen una estimación predictiva ni una validación económica de CP-033. El riesgo se calcula sobre el stake registrado; no se recomienda aumentar stakes tras pérdidas.</p></section>
+<section><h2>3. Importar y exportar</h2><p>Importación de JSON normalizado propio de este módulo. El JSON bruto de Telegram requiere un adaptador específico: no se interpreta ni se atribuyen señales automáticamente.</p>
+<input type="file" id="import" accept=".json,application/json"><button id="export" type="button">Exportar JSON</button><button id="clear" type="button">Borrar registros locales</button>
+<small>Datos almacenados exclusivamente en el navegador del dispositivo mediante localStorage. No se envían a GitHub ni a un servidor.</small></section>
+<section><h2>4. Auditoría de señales</h2><div class="scroll"><table><thead><tr><th>Fecha</th><th>Partido</th><th>Min</th><th>Marcador</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Final</th><th>Resultado</th><th>Beneficio €</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<script>
+'use strict';
+const KEY='radar_cp033_lsb_live_v1',markets={remaining_over_0_5:'+0,5 restantes',home_remaining_over_0_5:'+0,5 local',remaining_over_1_5:'+1,5 restantes'};
+let records=[];try{const x=JSON.parse(localStorage.getItem(KEY)||'[]');if(Array.isArray(x))records=x.filter(valid)}catch(e){}
+const $=id=>document.getElementById(id);
+function score(s){const m=/^(\d+)-(\d+)$/.exec(String(s));return m?[+m[1],+m[2]]:null}
+function valid(x){return x&&typeof x.match==='string'&&x.match.trim()&&typeof x.time==='string'&&Number.isFinite(+x.minute)&&+x.minute>=0&&+x.minute<=130&&score(x.score)&&(!x.final||score(x.final))&&markets[x.market]&&Number.isFinite(+x.odds)&&+x.odds>1&&Number.isFinite(+x.stake)&&+x.stake>=0}
+function outcome(x){if(!x.final)return null;const a=score(x.score),b=score(x.final);if(!a||!b||b[0]<a[0]||b[1]<a[1])return null;const n=b[0]+b[1]-a[0]-a[1];return x.market==='remaining_over_0_5'?n>=1:x.market==='remaining_over_1_5'?n>=2:b[0]>a[0]}
+function save(){localStorage.setItem(KEY,JSON.stringify(records));render()}
+function render(){const body=$('rows');body.replaceChildren();let settled=0,wins=0,profit=0,staked=0;const exposure=new Map(),seen=new Set();let duplicates=0;
+records.forEach((x,i)=>{const key=[x.time,x.match,x.minute,x.score,x.market].join('|');if(seen.has(key))duplicates++;seen.add(key);const o=outcome(x),p=o===null?null:o?x.stake*(x.odds-1):-x.stake;
+if(o!==null){settled++;if(o)wins++;profit+=p;staked+=x.stake}
+const matchKey=x.match.trim().toLowerCase()+'|'+x.time.slice(0,10);exposure.set(matchKey,(exposure.get(matchKey)||0)+x.stake);
+const tr=document.createElement('tr');[x.time,x.match,x.minute,x.score,markets[x.market],x.odds.toFixed(2),x.stake.toFixed(2),x.final||'—',o===null?'Pendiente':o?'Acierto':'Fallo',p===null?'—':p.toFixed(2)].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});const td=document.createElement('td'),b=document.createElement('button');b.textContent='Eliminar';b.onclick=()=>{records.splice(i,1);save()};td.appendChild(b);tr.appendChild(td);body.appendChild(tr)});
+const bank=+$('bankroll').value,max=Math.max(0,...exposure.values());$('metrics').textContent='Señales: '+records.length+' · Liquidadas: '+settled+' · Aciertos: '+wins+' · Tasa: '+(settled?(100*wins/settled).toFixed(1)+'%':'—')+' · Beneficio: '+profit.toFixed(2)+' € · ROI sobre stake liquidado: '+(staked?(100*profit/staked).toFixed(2)+'%':'—')+' · Exposición máxima acumulada por partido: '+max.toFixed(2)+' €'+(bank>0?' ('+(100*max/bank).toFixed(2)+'% bankroll)':'')+' · Señales duplicadas detectadas: '+duplicates}
+$('form').onsubmit=e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));const x={match:d.match.trim(),time:d.time,minute:+d.minute,score:d.score,market:d.market,odds:+d.odds,stake:+d.stake,final:d.final||''};if(!valid(x)){$('notice').textContent='Datos no válidos';return}const key=y=>[y.time,y.match,y.minute,y.score,y.market].join('|');if(records.some(y=>key(y)===key(x))){$('notice').textContent='Señal duplicada: no incorporada';return}records.push(x);save();$('notice').textContent='Señal registrada'};
+$('bankroll').oninput=render;
+$('export').onclick=()=>{const blob=new Blob([JSON.stringify(records,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='lsb_live_cp033.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+$('import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());if(!Array.isArray(data)||!data.every(valid))throw Error('Se requiere una lista de señales normalizadas válidas');const key=x=>[x.time,x.match,x.minute,x.score,x.market].join('|'),keys=new Set(records.map(key));let n=0;for(const x of data){if(!keys.has(key(x))){records.push({...x,minute:+x.minute,odds:+x.odds,stake:+x.stake});keys.add(key(x));n++}}save();$('notice').textContent=n+' señales importadas'}catch(err){$('notice').textContent='Importación rechazada: '+err.message}};
+$('clear').onclick=()=>{if(confirm('¿Borrar todas las señales locales?')){records=[];save()}};
+render();
+</script></body></html>
