@@ -20,6 +20,6 @@ function evaluate(signal,events=[]){
  const won=finalProgress&&(signal.market==='home_remaining_over_0_5'?finalProgress[0]:finalProgress[0]+finalProgress[1])>=required;
  return {status:final?(won?'win':'loss'):'live',counted,required,remaining:Math.max(0,required-counted),latest,final:final||null,goalEvents:used,invalidEvents:invalid};
 }
-function validateEvent(e){return e&&['goal','final'].includes(e.type)&&typeof e.match==='string'&&e.match.trim()&&typeof e.time==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(e.time)&&Number.isInteger(+e.minute)&&+e.minute>=0&&+e.minute<=130&&parse(e.score)}
+function validateEvent(e){return e&&['goal','final'].includes(e.type)&&typeof e.match==='string'&&e.match.trim()&&typeof e.time==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(e.time)&&Number.isInteger(+e.minute)&&+e.minute>=0&&+e.minute<=130&&Boolean(parse(e.score))}
 g.LSBEventTracker={parse,key,goals,evaluate,validateEvent};
 })(typeof window!=='undefined'?window:globalThis);
