@@ -4,7 +4,7 @@ const parse=s=>{const m=/^(\d+)-(\d+)$/.exec(String(s||''));return m?[+m[1],+m[2
 const key=x=>String(x.match||'').trim().toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ')+'|'+String(x.time||'').slice(0,10);
 const goals=(a,b)=>{const x=parse(a),y=parse(b);return x&&y&&y[0]>=x[0]&&y[1]>=x[1]?[y[0]-x[0],y[1]-x[1]]:null};
 function evaluate(signal,events=[]){
- const relevant=events.filter(e=>key(e)===key(signal)&&e.type==='goal'&&Number.isFinite(+e.minute)&&(+e.minute>=+signal.minute)&&String(e.time||'')>=String(signal.time||'')).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+ const relevant=events.filter(e=>key(e)===key(signal)&&e.type==='goal'&&Number.isFinite(+e.minute)&&String(e.time||'')>String(signal.time||'')).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
  let latest=signal.score,used=0,invalid=0;
  for(const e of relevant){if(!goals(latest,e.score)){invalid++;continue}latest=e.score;used++}
  const finalEvents=events.filter(e=>key(e)===key(signal)&&e.type==='final'&&String(e.time||'')>=String(signal.time||'')).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
