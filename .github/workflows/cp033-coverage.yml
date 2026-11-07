@@ -17,4 +17,7 @@ jobs:
         with:
           node-version: '22'
       - run: node --check cp033_coverage.js
+      - run: node --check cp033_comparison.js
+      - run: node --check tests/cp033_comparison.test.js
       - run: node tests/cp033_coverage.test.js
+      - run: node tests/cp033_comparison.test.js
