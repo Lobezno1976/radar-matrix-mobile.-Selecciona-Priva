@@ -1,7 +1,9 @@
 /* Isolated CP-033 historical reconciliation; CP-032 untouched. */
 (function(g){'use strict';
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
-const key=r=>[String(r.Date).slice(0,10),norm(r.HomeTeam),norm(r.AwayTeam)].join('|');
+const aliases={'valenciacf':'valencia','realmadridcf':'realmadrid','fcbarcelona':'barcelona','realbetisbalompie':'betis','realbetis':'betis','rcdespanyol':'espanyol','rcdespanyoldebarcelona':'espanyol','atleticomadrid':'atmadrid','clubatleticodemadrid':'atmadrid','athleticclub':'athbilbao','athleticbilbao':'athbilbao','realsociedaddefutbol':'sociedad','realsociedad':'sociedad','villarrealcf':'villarreal','sevillafc':'sevilla','getafecf':'getafe','elchecf':'elche','caosasuna':'osasuna','racingdesantander':'racing','realracingclubdesantander':'racing','rayovallecanodemadrid':'vallecano','rayovallecano':'vallecano','rcdevigo':'celta','rc celtadevigo':'celta'};
+const team=s=>{const n=norm(s);return aliases[n]||n};
+const key=r=>[String(r.Date).slice(0,10),team(r.HomeTeam),team(r.AwayTeam)].join('|');
 function reconcile(existing,incoming,source,at){
  const rows=existing.map(x=>({...x})),lookup=new Map(rows.map((r,i)=>[key(r),i])),events=[],conflicts=[];
  for(const item of incoming){
