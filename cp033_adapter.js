@@ -29,6 +29,16 @@ function run(rows,home,away,cutoff,markets,opts={}){
  });
  if(result.status!=='EXPERIMENTAL_JOINT_SEARCH')return {status:result.status,version:'CP033_GOVERNED_1',comparison:gate?.comparison,context_rows:context.length,home_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.HomeTeam)===norm(home)).length,away_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.AwayTeam)===norm(away)).length,details:result,audit:result.audit};
  const index=new Map(admitted.map(m=>[m.id,m]));
+ const seasonCutoff=String(cutoff).slice(0,10);
+ const year=Number(seasonCutoff.slice(0,4))-(Number(seasonCutoff.slice(5,7))<7?1:0);
+ const recentStart=(year-3)+'-07-01',longStart=(year-20)+'-07-01';
+ const jointWindow=(ids,start)=>{let n=0,hits=0;for(const row of context){
+  if(String(row.Date)<start)continue;
+  const vals=ids.map(id=>g.RadarMobileCatalog.settle(row,id));
+  if(vals.some(v=>v===null||v===undefined))continue;
+  n++;if(vals.every(v=>v===true))hits++;
+ }return {hits,n,frequency:n?hits/n:null};};
+ const enriched=result.coreOptions.map(x=>({...x,recent3:jointWindow(x.ids,recentStart),long20:jointWindow(x.ids,longStart)}));
  const variants=[result.core,...result.sat].map((s,i)=>({
   name:['CORE','SAT1','SAT2','SAT3'][i],legs:s.ids.map(id=>index.get(id)),
   joint_hits:s.hits,joint_n:s.n,joint_frequency:s.frequency,
@@ -38,7 +48,7 @@ function run(rows,home,away,cutoff,markets,opts={}){
   holdout_by_context:[],verified_joint_odds:s.verifiedJointOdds,ev:s.ev
  }));
  return {status:'CP033_GOVERNED_1',version:'CP033_V0_2',variants,comparison:gate?.comparison,
-  core_comparison:result.coreOptions.map(x=>({ids:x.ids,legs:x.ids.length,hits:x.hits,n:x.n,frequency:x.frequency,independence_product:x.independenceProduct,independence_gap:x.independenceGap,break_even_odds:x.breakEvenOdds,verified_joint_odds:x.verifiedJointOdds,ev:x.ev,removal_sensitivity:x.removalSensitivity})),
+  core_comparison:enriched.map(x=>({recent3:x.recent3,long20:x.long20,ids:x.ids,legs:x.ids.length,hits:x.hits,n:x.n,frequency:x.frequency,independence_product:x.independenceProduct,independence_gap:x.independenceGap,break_even_odds:x.breakEvenOdds,verified_joint_odds:x.verifiedJointOdds,ev:x.ev,removal_sensitivity:x.removalSensitivity})),
   context_rows:context.length,extensions_examined:result.examined,audit:{...result.audit,originalCatalogCount:markets.length,governedCount:admitted.length,gatePolicy:gate?.policy},
   historical_only:true,calibrated:false,global_optimum_proven:false,
   economic_validation:false,context_policy:'home_local_or_away_visitor_union'};
