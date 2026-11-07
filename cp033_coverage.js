@@ -2,10 +2,10 @@
 (function(g){'use strict';
 const EXCLUDED_PREFIXES=['FIRST_GOAL','FIRST_CORNER','FIRST_CARD','CORNER_1H','CARD_1H','C1H_','T1H_'];
 function eligible(m){
- const id=String(m&&m.id||'').toUpperCase();
+ const id=String(m&&m.id||'');
  if(!id)return false;
- if(EXCLUDED_PREFIXES.some(p=>id.startsWith(p)))return false;
- if(/^(GO[12][GL]|[A-Z]+\d+p5|BTTS_[YN]|W_[A-Z0-9]+|WC_[HAD]|WT_[HAD])$/.test(id))return true;
+ if(EXCLUDED_PREFIXES.some(p=>id.toUpperCase().startsWith(p)))return false;
+ if(/^(?:(?:GO[12][GL]|SG|SL|SA[GL]|SH[GL]|RG|RL|RA[GL]|RH[GL]|FG|FL|FA[GL]|FH[GL]|CG|CL|CA[GL]|CH[GL]|TG|TL|TA[GL]|TH[GL]|GG|GL|GA[GL]|GH[GL])\d+p5|BTTS_[YN]|W_(?:HA|HD|DA|H|A|D|H1|H2|H3P|A1|A2|A3P)|WC_[HAD]|WT_[HAD])$/i.test(id))return true;
  return false;
 }
 function filter(markets){return markets.filter(eligible)}
