@@ -1,0 +1,13 @@
+const {chromium}=require('playwright');const {spawn}=require('node:child_process');const assert=require('node:assert/strict');
+(async()=>{const server=spawn('python3',['-m','http.server','8765','--bind','127.0.0.1'],{stdio:'ignore'});let browser;
+try{await new Promise(r=>setTimeout(r,1000));browser=await chromium.launch({headless:true});const page=await browser.newPage();
+let corners=false;await page.route('https://www.football-data.co.uk/**',route=>route.fulfill({status:200,contentType:'text/csv',body:'Date,HomeTeam,AwayTeam,FTHG,FTAG,HC,AC\n01/11/2026,Valencia,Real Madrid,1,2,'+(corners?'7,4':',')+'\n'}));
+await page.route('https://raw.githubusercontent.com/openfootball/**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({matches:[{date:'2026-11-01',round:10,team1:'Valencia',team2:'Real Madrid'}]})}));
+await page.goto('http://127.0.0.1:8765/index.html');await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#sourceStatus').textContent.includes('Football-Data:'));
+const read=()=>page.evaluate(async()=>{const db=await new Promise((ok,fail)=>{const q=indexedDB.open('radar-matrix-private-v5');q.onsuccess=()=>ok(q.result);q.onerror=()=>fail(q.error)});const val=await new Promise((ok,fail)=>{const q=db.transaction('data','readonly').objectStore('data').get('history');q.onsuccess=()=>ok(q.result);q.onerror=()=>fail(q.error)});db.close();return val});
+let rows=await read();assert.equal(rows.length,1);assert.equal(Number(rows[0].FTHG),1);
+corners=true;await page.reload();await page.locator('#refresh').click();await page.waitForFunction(()=>document.querySelector('#sourceStatus').textContent.includes('Football-Data:'));
+rows=await read();assert.equal(rows.length,1);assert.equal(Number(rows[0].HC),7);
+await page.locator('#refresh').click();rows=await read();assert.equal(rows.length,1);
+console.log('Chromium CP-033 persistence, reload, enrichment and deduplication PASSED');
+}finally{if(browser)await browser.close();server.kill()}})().catch(e=>{console.error(e);process.exit(1)});
