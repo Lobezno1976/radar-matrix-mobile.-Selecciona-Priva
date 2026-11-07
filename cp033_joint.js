@@ -86,7 +86,21 @@ function build(rows,markets,settle,cutoff,options={}){
   const best=ranked[0];stages.push({depth,...best,indices:undefined});
   beam=depth>=coreSize?[best]:ranked.slice(0,beamWidth);
  }
- const core=stages[coreSize-1],sat=[];
+ // Compare complete CORE depths 2..4 instead of forcing one size.
+ const coreOptions=stages.filter(x=>x.depth>=2).map(x=>{
+   const independent=x.ids.reduce((p,id)=>p*(individual.find(v=>v.id===id)?.frequency??0),1);
+   const sensitivity=x.ids.map(removed=>{
+     const kept=x.ids.filter(id=>id!==removed);
+     const result=evaluate(kept.map(id=>markets.findIndex(m=>m.id===id)));
+     return {removed,remainingIds:kept,hits:result.hits,n:result.n,frequency:result.frequency,
+       frequencyGain:result.frequency===null||x.frequency===null?null:result.frequency-x.frequency};
+   });
+   return {...x,independenceProduct:independent,independenceGap:x.frequency-independent,
+     breakEvenOdds:x.frequency>0?1/x.frequency:null,removalSensitivity:sensitivity};
+ });
+ // Verified prices determine economic ranking; otherwise compare observed frequencies only.
+ coreOptions.sort((a,b)=>cmp(a,b));
+ const core=coreOptions[0],sat=[];
  // SAT branches are independent extensions of the same frozen CORE.
  if(core&&satCount){
   const coreIds=new Set(core.ids),coreIndices=core.ids.map(id=>markets.findIndex(m=>m.id===id));
@@ -111,7 +125,7 @@ function build(rows,markets,settle,cutoff,options={}){
   }
  }
 
- return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',satStructure:'INDEPENDENT_CORE_PLUS_ONE',core,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
+ return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',satStructure:'INDEPENDENT_CORE_PLUS_ONE',core,coreOptions,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
 }
 function preselect(rows,markets,settle,cutoff,options={}){
  const valid=rows.filter(r=>String(r.Date)<String(cutoff)),minimum=options.minTheoreticalOdds??1.125,retention=options.lineRetention??0.70;
