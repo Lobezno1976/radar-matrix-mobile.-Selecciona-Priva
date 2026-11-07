@@ -7,3 +7,11 @@ const again=j.reconcile(second.rows,[b],'test','t4');assert.equal(again.events[0
 const rounds=j.audit(second.rows,[{date:a.Date,home:a.HomeTeam,away:a.AwayTeam,round:10}], '2026/27','t5');assert.equal(rounds[9].finalized,1);assert.equal(rounds[9].missing,9);assert.equal(rounds[9].complete,false);console.log('CP-033 journal regression passed');
 
 const missing=j.reconcile(second.rows,[{...a,HC:null,AC:null}],'test','t6');assert.equal(missing.rows[0].HC,7);assert.equal(missing.events[0].action,'UNCHANGED');
+
+const next=j.reconcile(second.rows,[{...b,HY:2,AY:3}],'Football-Data','launch-3');
+assert.equal(next.rows.length,1);assert.equal(next.rows[0].HY,2);assert.equal(next.events[0].action,'ENRICHED');
+const repeated=j.reconcile(next.rows,[{...b,HY:2,AY:3}],'Football-Data','launch-4');
+assert.equal(repeated.rows.length,1);assert.equal(repeated.events[0].action,'UNCHANGED');
+const corrected=j.reconcile(next.rows,[{...b,HY:2,AY:3,FTAG:4}],'Football-Data','launch-5');
+assert.equal(corrected.rows[0].FTAG,2);assert.equal(corrected.conflicts.length,1);
+console.log('Repeated CP-033 refresh regression passed');
