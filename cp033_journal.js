@@ -10,6 +10,7 @@ function reconcile(existing,incoming,source,at){
   const k=key(item),score=[item.FTHG,item.FTAG];
   if(!item.Date||!item.HomeTeam||!item.AwayTeam||score.some(x=>x===null||x===undefined||x===''||!Number.isInteger(Number(x))||Number(x)<0)){events.push({key:k,action:'INVALID',source,at});continue}
   const i=lookup.get(k);
+  if(i!==undefined&&(['FTHG','FTAG'].some(f=>String(rows[i][f]??'')!==''&&String(rows[i][f])!==String(item[f])))){conflicts.push({key:k,field:'FT_SCORE',stored:[rows[i].FTHG,rows[i].FTAG],incoming:score,source,at});events.push({key:k,action:'SCORE_CONFLICT_SKIPPED',source,at});continue}
   if(i===undefined){lookup.set(k,rows.length);rows.push({...item});events.push({key:k,action:'ADDED',source,at});continue}
   const patch={},fields=[];
   for(const [field,value] of Object.entries(item)){
@@ -24,7 +25,7 @@ function reconcile(existing,incoming,source,at){
 }
 function fromProvider(p,parseDate){
  const r={Date:parseDate(p.date),HomeTeam:p.home,AwayTeam:p.away};
- const fields={FTHG:'home_goals',FTAG:'away_goals',HS:'home_shots',AS:'away_shots',HST:'home_sot',AST:'away_sot',HC:'home_corners',AC:'away_corners',HY:'home_cards',AY:'away_cards',HF:'home_fouls',AF:'away_fouls',HTHG:'home_ht_goals',HTAG:'away_ht_goals'};
+ const fields={FTHG:'home_goals',FTAG:'away_goals',HS:'home_shots',AS:'away_shots',HST:'home_sot',AST:'away_sot',HC:'home_corners',AC:'away_corners',HY:'home_cards',AY:'away_cards',HF:'home_fouls',AF:'away_fouls',HTHG:'home_ht_goals',HTAG:'away_ht_goals',HC1H:'home_corners_1h',AC1H:'away_corners_1h',HC2H:'home_corners_2h',AC2H:'away_corners_2h'};
  for(const [target,field] of Object.entries(fields)){const v=p[field];if(v!==null&&v!==undefined&&String(v).trim()!=='')r[target]=v}
  return r;
 }
