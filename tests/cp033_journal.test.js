@@ -15,3 +15,9 @@ assert.equal(repeated.rows.length,1);assert.equal(repeated.events[0].action,'UNC
 const corrected=j.reconcile(next.rows,[{...b,HY:2,AY:3,FTAG:4}],'Football-Data','launch-5');
 assert.equal(corrected.rows[0].FTAG,2);assert.equal(corrected.conflicts.length,1);
 console.log('Repeated CP-033 refresh regression passed');
+
+const alias=j.reconcile([{...a,HomeTeam:'Valencia CF',AwayTeam:'Real Madrid CF'}],[b],'CSV_IMPORT','t7');
+assert.equal(alias.rows.length,1);assert.equal(alias.rows[0].HC,7);
+const mergedImport=j.reconcile([{...a,HC:7}],[{...a,AC:4}],'CSV_IMPORT','t8');
+assert.equal(mergedImport.rows.length,1);assert.equal(mergedImport.rows[0].HC,7);assert.equal(mergedImport.rows[0].AC,4);
+console.log('CP-033 unified historical import regression passed');
