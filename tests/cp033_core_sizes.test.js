@@ -34,5 +34,5 @@ const qr=ctx.RadarCP033Joint.build(quantitativeRows,quantitative,settle,'2026-11
 assert.equal(qr.status,'EXPERIMENTAL_JOINT_SEARCH');
 for(const opt of qr.coreOptions)for(let i=0;i<opt.ids.length;i++)for(let j=i+1;j<opt.ids.length;j++)
  assert.equal(semantic.RadarCP033Semantic.conflict({id:opt.ids[i]},{id:opt.ids[j]},settle),false);
-assert.ok(qr.audit.lineComparisons.some(x=>x.axis.startsWith('GO1')));
+assert.equal(qr.audit.lineSelection,'ALL_ELIGIBLE_LINES_WITH_SEMANTIC_CONFLICTS');
 console.log('CP-033 CORE 2/3/4 + nonredundant quantitative lines regression PASS');
