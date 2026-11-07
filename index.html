@@ -145,6 +145,19 @@ function renderMatrixSummary(items){
  if(!item.variants){name.title=item.status||'Sin selección'}tbody.appendChild(tr)}
  table.appendChild(tbody);wrap.appendChild(table);root.appendChild(wrap);
  const audit=document.createElement('div');audit.className='matrix-scroll';const auditTitle=document.createElement('h4');auditTitle.textContent='Verificación numérica CORE/SAT · v24';root.appendChild(auditTitle);const auditTable=document.createElement('table');const auditHead=document.createElement('tr');for(const label of ['Partido','Rama','Aciertos','Muestra','Frecuencia']){const th=document.createElement('th');th.textContent=label;auditHead.appendChild(th)}auditTable.appendChild(auditHead);for(const item of items)for(const v of item.variants||[]){const tr=document.createElement('tr');const hits=Number(v.joint_hits),n=Number(v.joint_n);for(const value of [item.match,v.name,Number.isFinite(hits)?String(hits):'No disponible',Number.isFinite(n)?String(n):'No disponible',Number.isFinite(hits)&&n>0?(100*hits/n).toFixed(1)+'%':'Sin muestra']){const td=document.createElement('td');td.textContent=value;tr.appendChild(td)}auditTable.appendChild(tr)}audit.appendChild(auditTable);root.appendChild(audit);
+ const coreTitle=document.createElement('h4');coreTitle.textContent='CP-033 · CORE alternativos 2 / 3 / 4 mercados';root.appendChild(coreTitle);
+ const coreNote=document.createElement('p');coreNote.className='muted';coreNote.textContent='Frecuencias conjuntas observadas; 3T y 20T se calculan sobre la misma selección de mercados. Sin cuota conjunta verificada, no se infiere rentabilidad ni se acredita óptimo económico.';root.appendChild(coreNote);
+ const coreWrap=document.createElement('div');coreWrap.className='matrix-scroll';const coreTable=document.createElement('table');const coreHead=document.createElement('tr');
+ for(const label of ['Partido','CORE','Mercados','Conjunto 20T','Conjunto 3T','Producto individual','Cuota equilibrio 20T','Cuota verificada','EV histórico','Impacto de retirar']){
+ const th=document.createElement('th');th.textContent=label;coreHead.appendChild(th)}coreTable.appendChild(coreHead);
+ const fmtJoint=x=>x&&x.n?x.hits+'/'+x.n+' ('+(100*x.frequency).toFixed(1)+'%)':'Sin muestra';
+ for(const item of items)for(const option of item.core_comparison||[]){
+ const tr=document.createElement('tr');
+ const labels=option.ids.map(id=>{const leg=(item.variants||[]).flatMap(v=>v.legs||[]).find(l=>l.id===id);return leg?.label||id;});
+ const drops=(option.removal_sensitivity||[]).map(d=>d.removed+': '+(d.frequencyGain===null?'—':(100*d.frequencyGain).toFixed(1)+' pp')).join('; ');
+ const values=[item.match,option.legs+' mercados',labels.join(' + '),fmtJoint(option.long20),fmtJoint(option.recent3),option.independence_product===null?'—':(100*option.independence_product).toFixed(1)+'%',option.long20?.frequency>0?(1/option.long20.frequency).toFixed(2):'—',option.verified_joint_odds??'No verificada',option.ev===null?'—':(100*option.ev).toFixed(1)+'%',drops];
+ for(const val of values){const td=document.createElement('td');td.textContent=String(val);tr.appendChild(td)}coreTable.appendChild(tr)}
+ coreWrap.appendChild(coreTable);root.appendChild(coreWrap);
  const qualityTitle=document.createElement('h4');qualityTitle.textContent='Auditoría de calidad comercial · diagnóstico v25';root.appendChild(qualityTitle);
  const qualityIntro=document.createElement('p');qualityIntro.className='muted';qualityIntro.textContent='Diagnóstico informativo: detecta líneas permisivas y falta de cotización conjunta. No altera CP-033 ni califica la rentabilidad.';root.appendChild(qualityIntro);
  const qualityWrap=document.createElement('div');qualityWrap.className='matrix-scroll';const qualityTable=document.createElement('table');const qhead=document.createElement('tr');for(const label of ['Partido','Rama','Mercados seleccionados','Alertas','Precio conjunto']){const th=document.createElement('th');th.textContent=label;qhead.appendChild(th)}qualityTable.appendChild(qhead);
@@ -168,7 +181,7 @@ $('runStatus').textContent='Motor '+$('engine').value+' · 139 mercados · hist�
 for(const [home,away] of selectedMatches){
 try{
  const r=$('engine').value==='CP033'?RadarCP033Adapter.run(merged.rows,home,away,$('cutoff').value,RadarCP033Coverage.filter(catalog),{diversifyFamilies:true}):RadarMobileCatalog.select(merged.rows,home,away,$('cutoff').value,catalog,{useWeights:true});
- summaryRows.push(r.variants?{match:home+' – '+away,variants:r.variants,audit:r.audit}:{match:home+' – '+away,status:r.status,context_rows:r.context_rows,home_rows:r.home_rows,away_rows:r.away_rows,details:r.details});
+ summaryRows.push(r.variants?{match:home+' – '+away,variants:r.variants,core_comparison:r.core_comparison,audit:r.audit}:{match:home+' – '+away,status:r.status,context_rows:r.context_rows,home_rows:r.home_rows,away_rows:r.away_rows,details:r.details});
 }catch(e){summaryRows.push({match:home+' – '+away,status:'Error de cálculo: '+e.message})}
 await new Promise(resolve=>setTimeout(resolve,0))}
 const marketAudits=summaryRows.filter(x=>x.audit).map(x=>x.audit);const auditCounts=marketAudits.map(a=>a.originalCatalogCount??a.catalogCount);$('runStatus').textContent+=' · Revisión de catálogo: '+(auditCounts.length&&auditCounts.every(n=>n===139)?'139/139 mercados contrastados por partido':'INCOMPLETA ('+(auditCounts.join(', ')||'sin auditoría')+')')+'; la selección CORE/SAT queda gobernada por el filtro histórico 20T/3T.';renderMatrixSummary(summaryRows);
