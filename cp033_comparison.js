@@ -66,7 +66,7 @@ function govern(rows,home,away,cutoff,markets,odds={},options={}){
  const chosen=new Map(),rejected=[];
  for(const x of ranked){if(!x.admissible){rejected.push(x);continue}const axis=key(x.id);if(chosen.has(axis)){rejected.push({...x,reason:'LINEA_ALTERNATIVA'});continue}chosen.set(axis,x)}
  const ids=new Set([...chosen.values()].map(x=>x.id));
- return {markets:markets.filter(m=>ids.has(m.id)),comparison:ranked,frontier,chosen:[...chosen.values()],rejected,policy:'20T_3T_PRESELECTION_BEFORE_JOINT',priced:ranked.filter(x=>x.odds!==null).length};
+ return {markets:markets.filter(m=>ranked.some(x=>x.id===m.id&&x.admissible)),comparison:ranked,frontier,chosen:[...chosen.values()],rejected,policy:'20T_3T_ALL_ADMISSIBLE_LINES_TO_JOINT',priced:ranked.filter(x=>x.odds!==null).length};
 }
 g.RadarCP033Comparison={compare,govern,lineAxis,lineFrontier};
 })(typeof window!=='undefined'?window:globalThis);
