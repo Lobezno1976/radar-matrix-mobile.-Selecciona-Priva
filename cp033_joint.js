@@ -40,6 +40,20 @@ function build(rows,markets,settle,cutoff,options={}){
   const quote=odds[key],price=quote&&quote.verified===true&&Number.isFinite(Number(quote.odds))&&Number(quote.odds)>1?Number(quote.odds):null;
   return {ids,n,hits,frequency,verifiedJointOdds:price,ev:frequency!==null&&price!==null?frequency*price-1:null};
  }
+ function contribution(indices,removedIndex){
+  let n=0,baseHits=0,jointHits=0;
+  for(let k=0;k<valid.length;k++){
+   if(indices.some(i=>evaluated[i][k]===null||evaluated[i][k]===undefined))continue;
+   n++;
+   if(indices.every(i=>i===removedIndex||evaluated[i][k]===true)){
+    baseHits++;
+    if(evaluated[removedIndex][k]===true)jointHits++;
+   }
+  }
+  return {n,baseHits,jointHits,baseFrequency:n?baseHits/n:null,jointFrequency:n?jointHits/n:null,
+   conditionalHitRate:baseHits?jointHits/baseHits:null,
+   frequencyCost:n?(baseHits-jointHits)/n:null};
+ }
  function cmp(a,b){
   if(a.ev!==null&&b.ev!==null&&a.ev!==b.ev)return b.ev-a.ev;
   if((a.ev===null)!==(b.ev===null))return a.ev===null?1:-1;
@@ -74,7 +88,8 @@ function build(rows,markets,settle,cutoff,options={}){
      const kept=x.ids.filter(id=>id!==removed);
      const result=evaluate(kept.map(id=>markets.findIndex(m=>m.id===id)));
      return {removed,remainingIds:kept,hits:result.hits,n:result.n,frequency:result.frequency,
-       frequencyGain:result.frequency===null||x.frequency===null?null:result.frequency-x.frequency};
+       frequencyGain:result.frequency===null||x.frequency===null?null:result.frequency-x.frequency,
+       comparableSample:contribution(x.ids.map(id=>markets.findIndex(m=>m.id===id)),markets.findIndex(m=>m.id===removed))};
    });
    return {...x,indices:undefined,independenceProduct:independent,independenceGap:x.frequency-independent,
      breakEvenOdds:x.frequency>0?1/x.frequency:null,removalSensitivity:sensitivity};
@@ -94,7 +109,8 @@ function build(rows,markets,settle,cutoff,options={}){
     if((counts[family(candidate.id)]||0)>=2)continue;
    }
    const result=evaluate([...coreIndices,candidate.index]);examined++;
-   if(result.n>=minSample)extensions.push(result);
+   if(result.n>=minSample)extensions.push({...result,addedMarket:candidate.id,
+     contribution:contribution([...coreIndices,candidate.index],candidate.index)});
   }
   extensions.sort(cmp);
   const seenFamilies=new Set();
