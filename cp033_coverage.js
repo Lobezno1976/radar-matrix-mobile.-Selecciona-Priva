@@ -29,7 +29,7 @@ function summarize(rows){
 function windows(rows,home,away,cutoff){
  const aliases={'valencia cf':'valencia','real madrid cf':'real madrid','athletic club':'ath bilbao','athletic':'ath bilbao','real sociedad':'sociedad','atletico madrid':'ath madrid','at madrid':'ath madrid','fc barcelona':'barcelona','real betis':'betis','rayo vallecano':'vallecano','rcd espanyol':'espanol'};
  const norm=s=>{const n=String(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').trim();return aliases[n]||n;};
- const date=s=>{const t=String(s||'').trim();if(/^\\d{4}-\\d{2}-\\d{2}/.test(t))return t.slice(0,10);const m=/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/.exec(t);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):'';};
+ const date=s=>{const t=String(s||'').trim();if(t.length>=10&&t[4]==='-'&&t[7]==='-')return t.slice(0,10);const parts=t.split('/');if(parts.length===3&&parts[2].length>=4)return parts[2].slice(0,4)+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');return '';};
  const before=rows.filter(r=>date(r.Date)&&date(r.Date)<String(cutoff));
  const season=Number(String(cutoff).slice(0,4))-(Number(String(cutoff).slice(5,7))<7?1:0);
  const start=year=>String(year)+'-07-01';
