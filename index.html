@@ -168,21 +168,16 @@ function renderMatrixSummary(items){
  qualityWrap.appendChild(qualityTable);root.appendChild(qualityWrap);
  const foot=document.createElement('p');foot.className='muted';foot.textContent='X = selección incluida en esa rama. Cada mercado se marca una sola vez, con el color de la primera rama en que aparece. Porcentajes = frecuencias históricas conjuntas de la muestra utilizada por el motor; no son validación independiente ni probabilidades futuras. Desliza horizontalmente para ver todos los mercados.';root.appendChild(foot);
 }
-$('run').onclick=async()=>{if(!rows)return;$('run').disabled=true;$('matrixSummary').replaceChildren();const summaryRows=[];try{
+$('run').onclick=async()=>{$('run').disabled=true;$('matrixSummary').replaceChildren();const summaryRows=[];try{
 // Se consultan las fuentes antes de calcular; los fallos quedan visibles.
 const reports=await refresh();
 const selectedMatches=selectedMatchesNow();
 catalog??=await RadarMobileCatalog.loadCatalog();
-const provider=RadarMobileSources.getRows('Football-Data');
-// Nunca incorporar partidos futuros ni resultados finales incompletos; estadísticas ausentes permanecen nulas.
-const today=new Date();const todayLocal=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
-const complete=provider.filter(p=>{const d=parseDate(p.date);if(!d||d>=todayLocal)return false;const fields=['home_goals','away_goals'];return fields.every(k=>p[k]!==undefined&&p[k]!==null&&String(p[k]).trim()!==''&&Number.isInteger(Number(p[k]))&&Number(p[k])>=0)});
-const merged=RadarMobileCatalog.merge(rows.map(r=>({...r})),complete);
-if(merged.added){await dbWrite(merged.rows);setHistory(merged.rows,'actualizado')}
-$('runStatus').textContent='Motor '+$('engine').value+' · 139 mercados · histórico '+rows.length+' · nuevas filas completas '+merged.added+' · conflictos '+merged.conflicts+' · descartadas '+(provider.length-complete.length+merged.skipped)+' · '+selectedMatches.length+' partidos. Fuente Football-Data: '+(reports.find(r=>r.name==='Football-Data')?.status||'sin informe');
+const currentRows=rows||[];
+$('runStatus').textContent='Motor '+$('engine').value+' · histórico registrado '+currentRows.length+' · '+selectedMatches.length+' partidos · Football-Data: '+(reports.find(r=>r.name==='Football-Data')?.status||'sin informe');
 for(const [home,away] of selectedMatches){
 try{
- const r=$('engine').value==='CP033'?RadarCP033Adapter.run(merged.rows,home,away,$('cutoff').value,RadarCP033Coverage.filter(catalog),{diversifyFamilies:true}):RadarMobileCatalog.select(merged.rows,home,away,$('cutoff').value,catalog,{useWeights:true});
+ const r=$('engine').value==='CP033'?RadarCP033Adapter.run(currentRows,home,away,$('cutoff').value,RadarCP033Coverage.filter(catalog),{diversifyFamilies:true}):RadarMobileCatalog.select(currentRows,home,away,$('cutoff').value,catalog,{useWeights:true});
  summaryRows.push(r.variants?{match:home+' – '+away,variants:r.variants,core_comparison:r.core_comparison,audit:r.audit}:{match:home+' – '+away,status:r.status,context_rows:r.context_rows,home_rows:r.home_rows,away_rows:r.away_rows,details:r.details});
 }catch(e){summaryRows.push({match:home+' – '+away,status:'Error de cálculo: '+e.message})}
 await new Promise(resolve=>setTimeout(resolve,0))}
