@@ -32,10 +32,13 @@ function run(rows,home,away,cutoff,markets,opts={}){
  const variants=[result.core,...result.sat].map((s,i)=>({
   name:['CORE','SAT1','SAT2','SAT3'][i],legs:s.ids.map(id=>index.get(id)),
   joint_hits:s.hits,joint_n:s.n,joint_frequency:s.frequency,
+  independence_product:s.independenceProduct??null,independence_gap:s.independenceGap??null,
+  break_even_odds:s.breakEvenOdds??null,removal_sensitivity:s.removalSensitivity??[],
   train_by_context:[{hits:s.hits,n:s.n,pct:s.frequency===null?null:Math.round(s.frequency*100000)/1000}],
   holdout_by_context:[],verified_joint_odds:s.verifiedJointOdds,ev:s.ev
  }));
  return {status:'CP033_GOVERNED_1',version:'CP033_V0_2',variants,comparison:gate?.comparison,
+  core_comparison:result.coreOptions.map(x=>({ids:x.ids,legs:x.ids.length,hits:x.hits,n:x.n,frequency:x.frequency,independence_product:x.independenceProduct,independence_gap:x.independenceGap,break_even_odds:x.breakEvenOdds,verified_joint_odds:x.verifiedJointOdds,ev:x.ev,removal_sensitivity:x.removalSensitivity})),
   context_rows:context.length,extensions_examined:result.examined,audit:{...result.audit,originalCatalogCount:markets.length,governedCount:admitted.length,gatePolicy:gate?.policy},
   historical_only:true,calibrated:false,global_optimum_proven:false,
   economic_validation:false,context_policy:'home_local_or_away_visitor_union'};
