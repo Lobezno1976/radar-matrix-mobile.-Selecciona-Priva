@@ -12,31 +12,11 @@ function build(rows,markets,settle,cutoff,options={}){
  const priceEligible=rankedAll.filter(x=>x.frequency>0&&1/x.frequency+1e-12>=minTheoreticalOdds);
  const family=id=>id.startsWith('BTTS')?'BTTS':id.startsWith('W_')?'RESULTADO':id.startsWith('WC_')?'CORNERS_RESULTADO':id.startsWith('WT_')?'TARJETAS_RESULTADO':id.startsWith('GO')?'GOLES_PERIODOS':({S:'TIROS_PUERTA',R:'REMATES',F:'FALTAS',C:'CORNERS',T:'TARJETAS',G:'GOLES'}[id[0]]||'OTROS');
  const families={};for(const x of individual){const f=family(x.id),v=families[f]??={total:0,eligible:0,withoutData:0};v.total++;if(x.n>=minSample)v.eligible++;if(!x.n)v.withoutData++}
- // Compare neighboring thresholds BEFORE selecting the candidate pool.
- // Over: +1/+2; under: -1/-2. Never add both as separate legs.
- const parseLine=id=>{const m=/^([A-Z]+)(\d+)p5$/.exec(id);return m?{prefix:m[1],step:Number(m[2]),over:m[1].endsWith('G')}:null};
- const byId=new Map(priceEligible.map(x=>[x.id,x]));
- const axes=new Map();
- for(const x of priceEligible){const p=parseLine(x.id);if(!p)continue;const axis=p.prefix.replace(/[GL]$/,'');const key=axis+':'+(p.prefix.length===2?'total':p.prefix.includes('H')?'home':'away');if(!axes.has(key))axes.set(key,[]);axes.get(key).push({...x,line:p});}
+ // Preserve all eligible numeric thresholds; semantic conflicts prevent using
+ // two alternatives of the same measurement axis in a single combination.
  const minimumRetention=options.lineRetention??0.70;
- const selected=new Map(),lineComparisons=[];
- for(const [axis,items] of axes){
-   const ranked=items.slice().sort((a,b)=>b.frequency-a.frequency||a.id.localeCompare(b.id));
-   const baseline=ranked[0];if(!baseline)continue;
-   const p=baseline.line;const tests=[baseline];
-   for(const delta of [1,2]){
-     const id=p.prefix+(p.step+(p.over?delta:-delta))+'p5';
-     const candidate=byId.get(id);
-     if(candidate)tests.push({...candidate,line:parseLine(id)});
-   }
-   const admissible=tests.filter(x=>x.n>=minSample&&x.frequency>=baseline.frequency*minimumRetention);
-   const winner=admissible.sort((a,b)=>Math.abs(b.line.step-p.step)-Math.abs(a.line.step-p.step)||b.frequency-a.frequency)[0]||baseline;
-   selected.set(winner.id,winner);
-   lineComparisons.push({axis,baseline:baseline.id,selected:winner.id,options:tests.map(x=>({id:x.id,n:x.n,frequency:x.frequency})),retention:minimumRetention});
- }
- // Keep all special markets, plus the selected threshold for each numerical axis.
- for(const x of priceEligible)if(!parseLine(x.id))selected.set(x.id,x);
- const linePool=[...selected.values()].sort((a,b)=>b.frequency-a.frequency||b.n-a.n||a.id.localeCompare(b.id));
+ const lineComparisons=[];
+ const linePool=priceEligible.slice().sort((a,b)=>b.frequency-a.frequency||b.n-a.n||a.id.localeCompare(b.id));
  let eligible;
  if(options.diversifyFamilies===true){
   const perFamily=new Map(),pool=[];
@@ -45,7 +25,7 @@ function build(rows,markets,settle,cutoff,options={}){
   const chosen=new Set(eligible.map(x=>x.id));
   for(const x of linePool){if(eligible.length>=maxCandidates)break;if(!chosen.has(x.id)){eligible.push(x);chosen.add(x.id)}}
  }else eligible=linePool.slice(0,maxCandidates);
- const audit={minTheoreticalOdds,excludedByTheoreticalOdds:rankedAll.length-priceEligible.length,priceEligibleCount:priceEligible.length,catalogCount:markets.length,evaluatedCount:individual.length,eligibleCount:rankedAll.length,candidateCount:eligible.length,excludedBySample:individual.length-rankedAll.length,excludedByCandidateLimit:rankedAll.length-eligible.length,families,lineSelection:'NEIGHBOR_PLUS_MINUS_1_2_BEFORE_BEAM',lineRetention:minimumRetention,lineComparisons,diversified:options.diversifyFamilies===true,diversityRule:options.diversifyFamilies===true?'CORE_ONE_PER_FAMILY_AND_MAX_TWO_PER_CHAIN':'NONE'};
+ const audit={minTheoreticalOdds,excludedByTheoreticalOdds:rankedAll.length-priceEligible.length,priceEligibleCount:priceEligible.length,catalogCount:markets.length,evaluatedCount:individual.length,eligibleCount:rankedAll.length,candidateCount:eligible.length,excludedBySample:individual.length-rankedAll.length,excludedByCandidateLimit:rankedAll.length-eligible.length,families,lineSelection:'ALL_ELIGIBLE_LINES_WITH_SEMANTIC_CONFLICTS',lineRetention:minimumRetention,lineComparisons,diversified:options.diversifyFamilies===true,diversityRule:options.diversifyFamilies===true?'CORE_ONE_PER_FAMILY_AND_MAX_TWO_PER_CHAIN':'NONE'};
  const conflicts=options.conflicts||(g.RadarCP033Semantic?((a,b)=>g.RadarCP033Semantic.conflict(a,b,settle)):null);
  if(!conflicts)throw Error('CP033 semantic module not loaded');
  const odds=options.verifiedJointOdds||{};
@@ -60,13 +40,27 @@ function build(rows,markets,settle,cutoff,options={}){
   const quote=odds[key],price=quote&&quote.verified===true&&Number.isFinite(Number(quote.odds))&&Number(quote.odds)>1?Number(quote.odds):null;
   return {ids,n,hits,frequency,verifiedJointOdds:price,ev:frequency!==null&&price!==null?frequency*price-1:null};
  }
+ function contribution(indices,removedIndex){
+  let n=0,baseHits=0,jointHits=0;
+  for(let k=0;k<valid.length;k++){
+   if(indices.some(i=>evaluated[i][k]===null||evaluated[i][k]===undefined))continue;
+   n++;
+   if(indices.every(i=>i===removedIndex||evaluated[i][k]===true)){
+    baseHits++;
+    if(evaluated[removedIndex][k]===true)jointHits++;
+   }
+  }
+  return {n,baseHits,jointHits,baseFrequency:n?baseHits/n:null,jointFrequency:n?jointHits/n:null,
+   conditionalHitRate:baseHits?jointHits/baseHits:null,
+   frequencyCost:n?(baseHits-jointHits)/n:null};
+ }
  function cmp(a,b){
   if(a.ev!==null&&b.ev!==null&&a.ev!==b.ev)return b.ev-a.ev;
   if((a.ev===null)!==(b.ev===null))return a.ev===null?1:-1;
   return b.frequency-a.frequency||b.n-a.n||a.ids.join('|').localeCompare(b.ids.join('|'));
  }
- let beam=[{indices:[],ids:[],n:0,hits:0,frequency:1,ev:null}],stages=[],examined=0;
- const depthLimit=coreSize;
+ let beam=[{indices:[],ids:[],n:0,hits:0,frequency:1,ev:null}],stages=[],allCoreCandidates=[],examined=0;
+ const depthLimit=options.compareCoreSizes===false?coreSize:4;
  for(let depth=1;depth<=depthLimit;depth++){
   const next=[];
   for(const parent of beam)for(const candidate of eligible){
@@ -82,11 +76,27 @@ function build(rows,markets,settle,cutoff,options={}){
   const unique=new Map();
   for(const x of next){const key=x.ids.join('|');const prev=unique.get(key);if(!prev||cmp(x,prev)<0)unique.set(key,x);}
   const ranked=[...unique.values()].sort(cmp);
-  if(!ranked.length)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined,audit};
+  if(!ranked.length){if(depth<=2)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined,audit};break;}
   const best=ranked[0];stages.push({depth,...best,indices:undefined});
-  beam=depth>=coreSize?[best]:ranked.slice(0,beamWidth);
+  if(depth>=2)allCoreCandidates.push(...ranked.map(x=>({...x,depth})));
+  beam=ranked.slice(0,beamWidth);
  }
- const core=stages[coreSize-1],sat=[];
+ // Compare complete CORE depths 2..4 instead of forcing one size.
+ const coreOptions=allCoreCandidates.map(x=>{
+   const independent=x.ids.reduce((p,id)=>p*(individual.find(v=>v.id===id)?.frequency??0),1);
+   const sensitivity=x.ids.map(removed=>{
+     const kept=x.ids.filter(id=>id!==removed);
+     const result=evaluate(kept.map(id=>markets.findIndex(m=>m.id===id)));
+     return {removed,remainingIds:kept,hits:result.hits,n:result.n,frequency:result.frequency,
+       frequencyGain:result.frequency===null||x.frequency===null?null:result.frequency-x.frequency,
+       comparableSample:contribution(x.ids.map(id=>markets.findIndex(m=>m.id===id)),markets.findIndex(m=>m.id===removed))};
+   });
+   return {...x,indices:undefined,independenceProduct:independent,independenceGap:x.frequency-independent,
+     breakEvenOdds:x.frequency>0?1/x.frequency:null,removalSensitivity:sensitivity};
+ });
+ // Verified prices determine economic ranking; otherwise compare observed frequencies only.
+ coreOptions.sort((a,b)=>cmp(a,b));
+ const core=coreOptions[0],sat=[];
  // SAT branches are independent extensions of the same frozen CORE.
  if(core&&satCount){
   const coreIds=new Set(core.ids),coreIndices=core.ids.map(id=>markets.findIndex(m=>m.id===id));
@@ -99,7 +109,8 @@ function build(rows,markets,settle,cutoff,options={}){
     if((counts[family(candidate.id)]||0)>=2)continue;
    }
    const result=evaluate([...coreIndices,candidate.index]);examined++;
-   if(result.n>=minSample)extensions.push(result);
+   if(result.n>=minSample)extensions.push({...result,addedMarket:candidate.id,
+     contribution:contribution([...coreIndices,candidate.index],candidate.index)});
   }
   extensions.sort(cmp);
   const seenFamilies=new Set();
@@ -111,13 +122,13 @@ function build(rows,markets,settle,cutoff,options={}){
   }
  }
 
- return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',satStructure:'INDEPENDENT_CORE_PLUS_ONE',core,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
+ return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',coreCandidatesCompared:coreOptions.length,searchScope:'BEAM_LIMITED_NOT_GLOBAL_OPTIMUM',satStructure:'INDEPENDENT_CORE_PLUS_ONE',core,coreOptions,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
 }
 function preselect(rows,markets,settle,cutoff,options={}){
  const valid=rows.filter(r=>String(r.Date)<String(cutoff)),minimum=options.minTheoreticalOdds??1.125,retention=options.lineRetention??0.70;
  const eligible=markets.map(m=>{let n=0,hits=0;for(const r of valid){const v=settle(r,m.id);if(v===null||v===undefined)continue;n++;if(v)hits++;}return {id:m.id,n,frequency:n?hits/n:0};}).filter(x=>x.n>=(options.minSample??20)&&x.frequency>0&&1/x.frequency+1e-12>=minimum);
  const byId=new Map(eligible.map(x=>[x.id,x])),groups=new Map(),selected=[];
- for(const x of eligible){const m=/^([A-Z]+)(\d+)p5$/.exec(x.id);if(!m){selected.push(x);continue}const key=m[1];if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x)}
+ for(const x of eligible){const m=/^([A-Z]+[0-9]*[GL])(\d+)p5$/.exec(x.id);if(!m){selected.push(x);continue}const key=m[1];if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x)}
  for(const [prefix,items] of groups){items.sort((a,b)=>b.frequency-a.frequency);const base=items[0],p=/^(.*?)(\d+)p5$/.exec(base.id),step=Number(p[2]),over=prefix.endsWith('G');const candidates=[base,...[1,2].map(d=>byId.get(prefix+(step+(over?d:-d))+'p5')).filter(Boolean)];const acceptable=candidates.filter(x=>x.frequency>=base.frequency*retention);selected.push(acceptable[acceptable.length-1]||base)}
  return selected.sort((a,b)=>b.frequency-a.frequency).slice(0,options.maxCandidates??40);
 }

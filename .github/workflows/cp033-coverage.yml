@@ -1,0 +1,35 @@
+name: CP-033 coverage regression
+on:
+  push:
+    branches: [feature/cp033-market-coverage-extremes]
+  pull_request:
+    paths:
+      - 'cp033_coverage.js'
+      - 'catalog139.json'
+      - 'tests/cp033_coverage.test.js'
+      - '.github/workflows/cp033-coverage.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check cp033_coverage.js
+      - run: node --check cp033_joint.js
+      - run: node --check cp033_comparison.js
+      - run: node --check tests/cp033_comparison.test.js
+      - run: node tests/cp033_coverage.test.js
+      - run: node tests/cp033_comparison.test.js
+      - run: node tests/cp033_core_sizes.test.js
+
+      - run: node --check cp033_journal.js
+      - run: node tests/cp033_journal.test.js
+
+      - name: Install browser for CP-033 smoke test
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Browser smoke test
+        run: node tests/cp033_browser.test.js
