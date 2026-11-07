@@ -20,6 +20,12 @@ function reconcile(existing,incoming,source,at){
  }
  return {rows,events,conflicts};
 }
+function fromProvider(p,parseDate){
+ const r={Date:parseDate(p.date),HomeTeam:p.home,AwayTeam:p.away};
+ const fields={FTHG:'home_goals',FTAG:'away_goals',HS:'home_shots',AS:'away_shots',HST:'home_sot',AST:'away_sot',HC:'home_corners',AC:'away_corners',HY:'home_cards',AY:'away_cards',HF:'home_fouls',AF:'away_fouls',HTHG:'home_ht_goals',HTAG:'away_ht_goals'};
+ for(const [target,field] of Object.entries(fields)){const v=p[field];if(v!==null&&v!==undefined&&String(v).trim()!=='')r[target]=v}
+ return r;
+}
 function audit(rows,fixtures,season,at){
  const rounds=Array.from({length:38},(_,i)=>({season,round:i+1,expected:10,finalized:0,missing:10,duplicates:0,complete:false,checkedAt:at})),seen=new Set(),existing=new Set(rows.map(key));
  for(const f of fixtures){
@@ -30,5 +36,5 @@ function audit(rows,fixtures,season,at){
  for(const x of rounds){x.missing=Math.max(0,10-x.finalized);x.complete=x.finalized===10&&x.duplicates===0}
  return rounds;
 }
-g.RadarCP033Journal={reconcile,audit,key};
+g.RadarCP033Journal={reconcile,audit,key,fromProvider};
 })(typeof window!=='undefined'?window:globalThis);
