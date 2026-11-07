@@ -66,7 +66,7 @@ function build(rows,markets,settle,cutoff,options={}){
   return b.frequency-a.frequency||b.n-a.n||a.ids.join('|').localeCompare(b.ids.join('|'));
  }
  let beam=[{indices:[],ids:[],n:0,hits:0,frequency:1,ev:null}],stages=[],examined=0;
- const depthLimit=coreSize;
+ const depthLimit=options.compareCoreSizes===false?coreSize:4;
  for(let depth=1;depth<=depthLimit;depth++){
   const next=[];
   for(const parent of beam)for(const candidate of eligible){
@@ -82,9 +82,9 @@ function build(rows,markets,settle,cutoff,options={}){
   const unique=new Map();
   for(const x of next){const key=x.ids.join('|');const prev=unique.get(key);if(!prev||cmp(x,prev)<0)unique.set(key,x);}
   const ranked=[...unique.values()].sort(cmp);
-  if(!ranked.length)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined,audit};
+  if(!ranked.length){if(depth<=2)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined,audit};break;}
   const best=ranked[0];stages.push({depth,...best,indices:undefined});
-  beam=depth>=coreSize?[best]:ranked.slice(0,beamWidth);
+  beam=ranked.slice(0,beamWidth);
  }
  // Compare complete CORE depths 2..4 instead of forcing one size.
  const coreOptions=stages.filter(x=>x.depth>=2).map(x=>{
