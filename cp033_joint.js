@@ -65,7 +65,7 @@ function build(rows,markets,settle,cutoff,options={}){
   if((a.ev===null)!==(b.ev===null))return a.ev===null?1:-1;
   return b.frequency-a.frequency||b.n-a.n||a.ids.join('|').localeCompare(b.ids.join('|'));
  }
- let beam=[{indices:[],ids:[],n:0,hits:0,frequency:1,ev:null}],stages=[],examined=0;
+ let beam=[{indices:[],ids:[],n:0,hits:0,frequency:1,ev:null}],stages=[],allCoreCandidates=[],examined=0;
  const depthLimit=options.compareCoreSizes===false?coreSize:4;
  for(let depth=1;depth<=depthLimit;depth++){
   const next=[];
@@ -84,10 +84,11 @@ function build(rows,markets,settle,cutoff,options={}){
   const ranked=[...unique.values()].sort(cmp);
   if(!ranked.length){if(depth<=2)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined,audit};break;}
   const best=ranked[0];stages.push({depth,...best,indices:undefined});
+  if(depth>=2)allCoreCandidates.push(...ranked.map(x=>({...x,depth})));
   beam=ranked.slice(0,beamWidth);
  }
  // Compare complete CORE depths 2..4 instead of forcing one size.
- const coreOptions=stages.filter(x=>x.depth>=2).map(x=>{
+ const coreOptions=allCoreCandidates.map(x=>{
    const independent=x.ids.reduce((p,id)=>p*(individual.find(v=>v.id===id)?.frequency??0),1);
    const sensitivity=x.ids.map(removed=>{
      const kept=x.ids.filter(id=>id!==removed);
@@ -95,7 +96,7 @@ function build(rows,markets,settle,cutoff,options={}){
      return {removed,remainingIds:kept,hits:result.hits,n:result.n,frequency:result.frequency,
        frequencyGain:result.frequency===null||x.frequency===null?null:result.frequency-x.frequency};
    });
-   return {...x,independenceProduct:independent,independenceGap:x.frequency-independent,
+   return {...x,indices:undefined,independenceProduct:independent,independenceGap:x.frequency-independent,
      breakEvenOdds:x.frequency>0?1/x.frequency:null,removalSensitivity:sensitivity};
  });
  // Verified prices determine economic ranking; otherwise compare observed frequencies only.
@@ -125,7 +126,7 @@ function build(rows,markets,settle,cutoff,options={}){
   }
  }
 
- return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',satStructure:'INDEPENDENT_CORE_PLUS_ONE',core,coreOptions,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
+ return {version:'CP033_V0_2',status:'EXPERIMENTAL_JOINT_SEARCH',coreCandidatesCompared:coreOptions.length,searchScope:'BEAM_LIMITED_NOT_GLOBAL_OPTIMUM',satStructure:'INDEPENDENT_CORE_PLUS_ONE',core,coreOptions,sat,stages,examined,audit,optimalityProven:false,frequencyType:'historical_joint',priceRequirement:'verified_joint_quote'};
 }
 function preselect(rows,markets,settle,cutoff,options={}){
  const valid=rows.filter(r=>String(r.Date)<String(cutoff)),minimum=options.minTheoreticalOdds??1.125,retention=options.lineRetention??0.70;
