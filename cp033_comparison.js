@@ -26,11 +26,35 @@ function compare(rows,home,away,cutoff,markets,odds={}){
  status:price===null?'SIN_CUOTA':minLong===null?'SIN_DATOS':minLong>threshold&&minRecent!==null&&minRecent>threshold?'SUPERA_UMBRAL_HISTORICO':'NO_SUPERA_UMBRAL'};
  });
 }
+function lineAxis(id){
+ const m=/^([A-Z]+?)(\\d+)p5$/.exec(id);
+ if(!m)return null;
+ const prefix=m[1],direction=prefix.slice(-1);
+ if(direction!=='G'&&direction!=='L')return null;
+ return {axis:prefix.slice(0,-1),direction,line:Number(m[2])+0.5};
+}
+function lineFrontier(compared){
+ const groups=new Map();
+ for(const x of compared){
+  const parsed=lineAxis(x.id);if(!parsed)continue;
+  if(!groups.has(parsed.axis))groups.set(parsed.axis,[]);
+  groups.get(parsed.axis).push({...x,line:parsed.line,direction:parsed.direction});
+ }
+ return [...groups].map(([axis,items])=>({
+  axis,lines:items.sort((a,b)=>a.line-b.line||a.direction.localeCompare(b.direction)).map(x=>({
+   id:x.id,label:x.label,line:x.line,direction:x.direction,
+   stats:x.stats,odds:x.odds,threshold:x.threshold,
+   minLong:x.minLong,minRecent:x.minRecent,
+   historicalEdge:x.edge
+  }))
+ }));
+}
 function govern(rows,home,away,cutoff,markets,odds={},options={}){
  const minLong=options.minLong??20,minRecent=options.minRecent??10;
  const compared=compare(rows,home,away,cutoff,markets,odds);
+ const frontier=lineFrontier(compared);
  const min=(x,keys,n)=>keys.every(k=>x.stats[k].n>=n)?Math.min(...keys.map(k=>x.stats[k].pct)):null;
- const key=id=>{const m=/^([A-Z]+?)(\d+)p5$/.exec(id);return m?m[1].replace(/[GL]$/,''):'SPECIAL:'+id};
+ const key=id=>lineAxis(id)?.axis||'SPECIAL:'+id;
  const ranked=compared.map(x=>{
   const long=min(x,['home','away'],minLong),recent=min(x,['home3','away3'],minRecent);
   const reliable=long!==null&&recent!==null;
@@ -42,7 +66,7 @@ function govern(rows,home,away,cutoff,markets,odds={},options={}){
  const chosen=new Map(),rejected=[];
  for(const x of ranked){if(!x.admissible){rejected.push(x);continue}const axis=key(x.id);if(chosen.has(axis)){rejected.push({...x,reason:'LINEA_ALTERNATIVA'});continue}chosen.set(axis,x)}
  const ids=new Set([...chosen.values()].map(x=>x.id));
- return {markets:markets.filter(m=>ids.has(m.id)),comparison:ranked,chosen:[...chosen.values()],rejected,policy:'20T_3T_PRESELECTION_BEFORE_JOINT',priced:ranked.filter(x=>x.odds!==null).length};
+ return {markets:markets.filter(m=>ids.has(m.id)),comparison:ranked,frontier,chosen:[...chosen.values()],rejected,policy:'20T_3T_PRESELECTION_BEFORE_JOINT',priced:ranked.filter(x=>x.odds!==null).length};
 }
-g.RadarCP033Comparison={compare,govern};
+g.RadarCP033Comparison={compare,govern,lineAxis,lineFrontier};
 })(typeof window!=='undefined'?window:globalThis);
