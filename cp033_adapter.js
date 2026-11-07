@@ -20,14 +20,14 @@ function run(rows,home,away,cutoff,markets,opts={}){
  const context=rows.filter(r=>String(r.Date)<String(cutoff)&&(norm(r.HomeTeam)===norm(home)||norm(r.AwayTeam)===norm(away)));
  const gate=opts.historicalGate===false?null:g.RadarCP033Comparison.govern(rows,home,away,cutoff,markets,opts.verifiedMarketOdds||{},opts.gateOptions||{});
  const admitted=gate?gate.markets:markets;
- if(gate&&admitted.length<2)return {status:'NO_HISTORICAL_CANDIDATES',version:'CP033_GOVERNED_1',context_rows:context.length,comparison:gate.comparison,audit:{catalogCount:markets.length,governedCount:admitted.length,gatePolicy:gate.policy}};
+ if(gate&&admitted.length<2)return {status:'NO_HISTORICAL_CANDIDATES',version:'CP033_GOVERNED_1',context_rows:context.length,comparison:gate.comparison,line_frontier:gate.frontier,audit:{catalogCount:markets.length,governedCount:admitted.length,gatePolicy:gate.policy}};
  const result=g.RadarCP033Joint.build(context,admitted,g.RadarMobileCatalog.settle,cutoff,{
   minSample:opts.minSample??20,coreSize:opts.coreSize??3,satCount:opts.satCount??3,
   maxCandidates:opts.maxCandidates??40,beamWidth:opts.beamWidth??100,
   verifiedJointOdds:opts.verifiedJointOdds||{},diversifyFamilies:opts.diversifyFamilies!==false,
   minTheoreticalOdds:opts.minTheoreticalOdds??1.125,lineRetention:opts.lineRetention??0.70
  });
- if(result.status!=='EXPERIMENTAL_JOINT_SEARCH')return {status:result.status,version:'CP033_GOVERNED_1',comparison:gate?.comparison,context_rows:context.length,home_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.HomeTeam)===norm(home)).length,away_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.AwayTeam)===norm(away)).length,details:result,audit:result.audit};
+ if(result.status!=='EXPERIMENTAL_JOINT_SEARCH')return {status:result.status,version:'CP033_GOVERNED_1',comparison:gate?.comparison,line_frontier:gate?.frontier,context_rows:context.length,home_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.HomeTeam)===norm(home)).length,away_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.AwayTeam)===norm(away)).length,details:result,audit:result.audit};
  const index=new Map(admitted.map(m=>[m.id,m]));
  const seasonCutoff=String(cutoff).slice(0,10);
  const year=Number(seasonCutoff.slice(0,4))-(Number(seasonCutoff.slice(5,7))<7?1:0);
@@ -47,7 +47,7 @@ function run(rows,home,away,cutoff,markets,opts={}){
   train_by_context:[{hits:s.hits,n:s.n,pct:s.frequency===null?null:Math.round(s.frequency*100000)/1000}],
   holdout_by_context:[],verified_joint_odds:s.verifiedJointOdds,ev:s.ev
  }));
- return {status:'CP033_GOVERNED_1',version:'CP033_V0_2',variants,comparison:gate?.comparison,
+ return {status:'CP033_GOVERNED_1',version:'CP033_V0_2',variants,comparison:gate?.comparison,line_frontier:gate?.frontier,
   core_comparison:enriched.map(x=>({recent3:x.recent3,long20:x.long20,ids:x.ids,legs:x.ids.length,hits:x.hits,n:x.n,frequency:x.frequency,independence_product:x.independenceProduct,independence_gap:x.independenceGap,break_even_odds:x.breakEvenOdds,verified_joint_odds:x.verifiedJointOdds,ev:x.ev,removal_sensitivity:x.removalSensitivity})),
   context_rows:context.length,extensions_examined:result.examined,audit:{...result.audit,originalCatalogCount:markets.length,governedCount:admitted.length,gatePolicy:gate?.policy},
   historical_only:true,calibrated:false,global_optimum_proven:false,
