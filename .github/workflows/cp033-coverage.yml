@@ -1,0 +1,20 @@
+name: CP-033 coverage regression
+on:
+  push:
+    branches: [feature/cp033-market-coverage-extremes]
+  pull_request:
+    paths:
+      - 'cp033_coverage.js'
+      - 'catalog139.json'
+      - 'tests/cp033_coverage.test.js'
+      - '.github/workflows/cp033-coverage.yml'
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check cp033_coverage.js
+      - run: node tests/cp033_coverage.test.js
