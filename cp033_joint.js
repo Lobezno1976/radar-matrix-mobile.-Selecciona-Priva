@@ -14,7 +14,7 @@ function build(rows,markets,settle,cutoff,options={}){
  const families={};for(const x of individual){const f=family(x.id),v=families[f]??={total:0,eligible:0,withoutData:0};v.total++;if(x.n>=minSample)v.eligible++;if(!x.n)v.withoutData++}
  // Compare neighboring thresholds BEFORE selecting the candidate pool.
  // Over: +1/+2; under: -1/-2. Never add both as separate legs.
- const parseLine=id=>{const m=/^([A-Z]+)(\d+)p5$/.exec(id);return m?{prefix:m[1],step:Number(m[2]),over:m[1].endsWith('G')}:null};
+ const parseLine=id=>{const m=/^([A-Z]+[0-9]*[GL])(\d+)p5$/.exec(id);return m?{prefix:m[1],step:Number(m[2]),over:m[1].endsWith('G')}:null};
  const byId=new Map(priceEligible.map(x=>[x.id,x]));
  const axes=new Map();
  for(const x of priceEligible){const p=parseLine(x.id);if(!p)continue;const axis=p.prefix.replace(/[GL]$/,'');const key=axis+':'+(p.prefix.length===2?'total':p.prefix.includes('H')?'home':'away');if(!axes.has(key))axes.set(key,[]);axes.get(key).push({...x,line:p});}
@@ -131,7 +131,7 @@ function preselect(rows,markets,settle,cutoff,options={}){
  const valid=rows.filter(r=>String(r.Date)<String(cutoff)),minimum=options.minTheoreticalOdds??1.125,retention=options.lineRetention??0.70;
  const eligible=markets.map(m=>{let n=0,hits=0;for(const r of valid){const v=settle(r,m.id);if(v===null||v===undefined)continue;n++;if(v)hits++;}return {id:m.id,n,frequency:n?hits/n:0};}).filter(x=>x.n>=(options.minSample??20)&&x.frequency>0&&1/x.frequency+1e-12>=minimum);
  const byId=new Map(eligible.map(x=>[x.id,x])),groups=new Map(),selected=[];
- for(const x of eligible){const m=/^([A-Z]+)(\d+)p5$/.exec(x.id);if(!m){selected.push(x);continue}const key=m[1];if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x)}
+ for(const x of eligible){const m=/^([A-Z]+[0-9]*[GL])(\d+)p5$/.exec(x.id);if(!m){selected.push(x);continue}const key=m[1];if(!groups.has(key))groups.set(key,[]);groups.get(key).push(x)}
  for(const [prefix,items] of groups){items.sort((a,b)=>b.frequency-a.frequency);const base=items[0],p=/^(.*?)(\d+)p5$/.exec(base.id),step=Number(p[2]),over=prefix.endsWith('G');const candidates=[base,...[1,2].map(d=>byId.get(prefix+(step+(over?d:-d))+'p5')).filter(Boolean)];const acceptable=candidates.filter(x=>x.frequency>=base.frequency*retention);selected.push(acceptable[acceptable.length-1]||base)}
  return selected.sort((a,b)=>b.frequency-a.frequency).slice(0,options.maxCandidates??40);
 }
