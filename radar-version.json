@@ -1,0 +1,8 @@
+{
+  "canonical_version": "CP-033",
+  "previous_version": "CP-032",
+  "previous_role": "rollback_only",
+  "source": "index.html",
+  "validation_status": "not_verified",
+  "note": "Version identity does not certify engine tests or deployment."
+}
