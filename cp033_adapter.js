@@ -18,22 +18,25 @@ function norm(s){
 function run(rows,home,away,cutoff,markets,opts={}){
  if(norm(home)===norm(away))throw Error('Equipos idénticos');
  const context=rows.filter(r=>String(r.Date)<String(cutoff)&&(norm(r.HomeTeam)===norm(home)||norm(r.AwayTeam)===norm(away)));
- const result=g.RadarCP033Joint.build(context,markets,g.RadarMobileCatalog.settle,cutoff,{
+ const gate=opts.historicalGate===false?null:g.RadarCP033Comparison.govern(rows,home,away,cutoff,markets,opts.verifiedMarketOdds||{},opts.gateOptions||{});
+ const admitted=gate?gate.markets:markets;
+ if(gate&&admitted.length<2)return {status:'NO_HISTORICAL_CANDIDATES',version:'CP033_GOVERNED_1',context_rows:context.length,comparison:gate.comparison,audit:{catalogCount:markets.length,governedCount:admitted.length,gatePolicy:gate.policy}};
+ const result=g.RadarCP033Joint.build(context,admitted,g.RadarMobileCatalog.settle,cutoff,{
   minSample:opts.minSample??20,coreSize:opts.coreSize??3,satCount:opts.satCount??3,
   maxCandidates:opts.maxCandidates??40,beamWidth:opts.beamWidth??100,
   verifiedJointOdds:opts.verifiedJointOdds||{},diversifyFamilies:opts.diversifyFamilies!==false,
   minTheoreticalOdds:opts.minTheoreticalOdds??1.125,lineRetention:opts.lineRetention??0.70
  });
- if(result.status!=='EXPERIMENTAL_JOINT_SEARCH')return {status:result.status,version:'CP033_CANONICAL_BASELINE_1',context_rows:context.length,home_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.HomeTeam)===norm(home)).length,away_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.AwayTeam)===norm(away)).length,details:result,audit:result.audit};
- const index=new Map(markets.map(m=>[m.id,m]));
+ if(result.status!=='EXPERIMENTAL_JOINT_SEARCH')return {status:result.status,version:'CP033_GOVERNED_1',comparison:gate?.comparison,context_rows:context.length,home_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.HomeTeam)===norm(home)).length,away_rows:rows.filter(r=>String(r.Date)<String(cutoff)&&norm(r.AwayTeam)===norm(away)).length,details:result,audit:result.audit};
+ const index=new Map(admitted.map(m=>[m.id,m]));
  const variants=[result.core,...result.sat].map((s,i)=>({
   name:['CORE','SAT1','SAT2','SAT3'][i],legs:s.ids.map(id=>index.get(id)),
   joint_hits:s.hits,joint_n:s.n,joint_frequency:s.frequency,
   train_by_context:[{hits:s.hits,n:s.n,pct:s.frequency===null?null:Math.round(s.frequency*100000)/1000}],
   holdout_by_context:[],verified_joint_odds:s.verifiedJointOdds,ev:s.ev
  }));
- return {status:'CP033_CANONICAL_BASELINE_1',version:'CP033_V0_2',variants,
-  context_rows:context.length,extensions_examined:result.examined,audit:result.audit,
+ return {status:'CP033_GOVERNED_1',version:'CP033_V0_2',variants,comparison:gate?.comparison,
+  context_rows:context.length,extensions_examined:result.examined,audit:{...result.audit,originalCatalogCount:markets.length,governedCount:admitted.length,gatePolicy:gate?.policy},
   historical_only:true,calibrated:false,global_optimum_proven:false,
   economic_validation:false,context_policy:'home_local_or_away_visitor_union'};
 }
