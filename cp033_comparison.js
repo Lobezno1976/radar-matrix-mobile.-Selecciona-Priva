@@ -27,7 +27,7 @@ function compare(rows,home,away,cutoff,markets,odds={}){
  });
 }
 function lineAxis(id){
- const m=/^([A-Z]+?)(\d+)p5$/.exec(id);
+ const m=/^([A-Z]+[0-9]*[GL])(\d+)p5$/.exec(id);
  if(!m)return null;
  const prefix=m[1],direction=prefix.slice(-1);
  if(direction!=='G'&&direction!=='L')return null;
