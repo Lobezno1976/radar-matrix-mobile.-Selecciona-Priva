@@ -11,6 +11,14 @@ assert.ok(r.coreCandidatesCompared>=3);
 assert.equal(r.searchScope,'BEAM_LIMITED_NOT_GLOBAL_OPTIMUM');
 for(const x of r.coreOptions){assert.equal(x.n,40);assert.equal(x.removalSensitivity.length,x.ids.length);assert.ok(x.independenceProduct>=0&&x.independenceProduct<=1);assert.ok(Math.abs(x.breakEvenOdds-1/x.frequency)<1e-10);}
 assert.equal(r.core.ids.length,2);
+for(const option of r.coreOptions)for(const leg of option.removalSensitivity){
+ const c=leg.comparableSample;
+ assert.equal(c.n,40);
+ assert.ok(c.jointHits<=c.baseHits);
+ assert.ok(c.frequencyCost>=0);
+ assert.ok(c.conditionalHitRate>=0&&c.conditionalHitRate<=1);
+ assert.ok(Math.abs(c.jointFrequency-option.frequency)<1e-12);
+}
 // Numeric lines must not appear as two legs on the same measurement axis.
 const semantic={};semantic.window=semantic;
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','cp033_semantic.js'),'utf8'),semantic);
