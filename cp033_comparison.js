@@ -1,6 +1,6 @@
 /* CP-033 historical candidate comparison: all supported markets, no synthetic odds. */
 (function(g){'use strict';
-const norm=s=>g.RadarBrowserEngine.norm(s);
+const norm=s=>g.RadarCP033Adapter.normalize(s);
 const date=s=>g.RadarBrowserEngine.date(s);
 function compare(rows,home,away,cutoff,markets,odds={}){
  const end=date(cutoff);if(!end)throw Error('Fecha de corte no válida');
@@ -16,7 +16,7 @@ function compare(rows,home,away,cutoff,markets,odds={}){
  away3:recent.filter(r=>norm(r.AwayTeam)===norm(away))};
  function count(sample,id){let n=0,hits=0;for(const row of sample){let v=g.RadarMobileCatalog.settle(row,id);if(v===null||v===undefined)continue;n++;if(v)hits++}return {n,hits,pct:n?100*hits/n:null}}
  return markets.map(m=>{const stats=Object.fromEntries(Object.entries(contexts).map(([k,v])=>[k,count(v,m.id)]));
- const q=Number(odds[m.id]);const price=Number.isFinite(q)&&q>1?q:null;
+ const q=Object.prototype.hasOwnProperty.call(odds,m.id)?Number(odds[m.id]):NaN;const price=Number.isFinite(q)&&q>1?q:null;
  const threshold=price?100/price:null;
  const rates=['home','away'].map(k=>stats[k].pct).filter(v=>v!==null);
  const recentRates=['home3','away3'].map(k=>stats[k].pct).filter(v=>v!==null);
@@ -26,5 +26,23 @@ function compare(rows,home,away,cutoff,markets,odds={}){
  status:price===null?'SIN_CUOTA':minLong===null?'SIN_DATOS':minLong>threshold&&minRecent!==null&&minRecent>threshold?'SUPERA_UMBRAL_HISTORICO':'NO_SUPERA_UMBRAL'};
  });
 }
-g.RadarCP033Comparison={compare};
+function govern(rows,home,away,cutoff,markets,odds={},options={}){
+ const minLong=options.minLong??20,minRecent=options.minRecent??10;
+ const compared=compare(rows,home,away,cutoff,markets,odds);
+ const min=(x,keys,n)=>keys.every(k=>x.stats[k].n>=n)?Math.min(...keys.map(k=>x.stats[k].pct)):null;
+ const key=id=>{const m=/^([A-Z]+?)(\\d+)p5$/.exec(id);return m?m[1].replace(/[GL]$/,''):'SPECIAL:'+id};
+ const ranked=compared.map(x=>{
+  const long=min(x,['home','away'],minLong),recent=min(x,['home3','away3'],minRecent);
+  const reliable=long!==null&&recent!==null;
+  const historicalScore=reliable?0.65*long+0.35*recent:null;
+  const edge=x.threshold===null?null:historicalScore===null?null:historicalScore-x.threshold;
+  const admissible=reliable&&(x.threshold===null||edge>0);
+  return {...x,long,recent,historicalScore,edge,admissible,reason:!reliable?'MUESTRA_INSUFICIENTE':x.threshold!==null&&edge<=0?'SIN_VENTAJA_HISTORICA':'CANDIDATO_HISTORICO'};
+ }).sort((a,b)=>(b.admissible?1:0)-(a.admissible?1:0)||((b.edge??b.historicalScore??-1)-(a.edge??a.historicalScore??-1))||a.id.localeCompare(b.id));
+ const chosen=new Map(),rejected=[];
+ for(const x of ranked){if(!x.admissible){rejected.push(x);continue}const axis=key(x.id);if(chosen.has(axis)){rejected.push({...x,reason:'LINEA_ALTERNATIVA'});continue}chosen.set(axis,x)}
+ const ids=new Set([...chosen.values()].map(x=>x.id));
+ return {markets:markets.filter(m=>ids.has(m.id)),comparison:ranked,chosen:[...chosen.values()],rejected,policy:'20T_3T_PRESELECTION_BEFORE_JOINT',priced:ranked.filter(x=>x.odds!==null).length};
+}
+g.RadarCP033Comparison={compare,govern};
 })(typeof window!=='undefined'?window:globalThis);
