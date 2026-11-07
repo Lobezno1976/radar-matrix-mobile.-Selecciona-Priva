@@ -27,13 +27,15 @@ function summarize(rows){
  });
 }
 function windows(rows,home,away,cutoff){
- const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
- const before=rows.filter(r=>String(r.Date)<String(cutoff));
+ const aliases={'valencia cf':'valencia','real madrid cf':'real madrid','athletic club':'ath bilbao','athletic':'ath bilbao','real sociedad':'sociedad','atletico madrid':'ath madrid','at madrid':'ath madrid','fc barcelona':'barcelona','real betis':'betis','rayo vallecano':'vallecano','rcd espanyol':'espanol'};
+ const norm=s=>{const n=String(s||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').trim();return aliases[n]||n;};
+ const date=s=>{const t=String(s||'').trim();if(/^\\d{4}-\\d{2}-\\d{2}/.test(t))return t.slice(0,10);const m=/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})/.exec(t);return m?m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0'):'';};
+ const before=rows.filter(r=>date(r.Date)&&date(r.Date)<String(cutoff));
  const season=Number(String(cutoff).slice(0,4))-(Number(String(cutoff).slice(5,7))<7?1:0);
  const start=year=>String(year)+'-07-01';
- const last3=before.filter(r=>String(r.Date)>=start(season-3)&&String(r.Date)<start(season));
- const current=before.filter(r=>String(r.Date)>=start(season));
- const subsets={h2h:before.filter(r=>norm(r.HomeTeam)===norm(home)&&norm(r.AwayTeam)===norm(away)),
+ const last3=before.filter(r=>date(r.Date)>=start(season-3)&&date(r.Date)<start(season));
+ const current=before.filter(r=>date(r.Date)>=start(season));
+ const subsets={h2h:before.filter(r=>date(r.Date)>=start(season-3)&&norm(r.HomeTeam)===norm(home)&&norm(r.AwayTeam)===norm(away)),
  home3:last3.filter(r=>norm(r.HomeTeam)===norm(home)),away3:last3.filter(r=>norm(r.AwayTeam)===norm(away)),
  homeCurrent:current.filter(r=>norm(r.HomeTeam)===norm(home)),awayCurrent:current.filter(r=>norm(r.AwayTeam)===norm(away))};
  return Object.fromEntries(Object.entries(subsets).map(([key,value])=>[key,summarize(value)]));
