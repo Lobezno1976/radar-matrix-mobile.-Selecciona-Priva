@@ -30,7 +30,7 @@ function govern(rows,home,away,cutoff,markets,odds={},options={}){
  const minLong=options.minLong??20,minRecent=options.minRecent??10;
  const compared=compare(rows,home,away,cutoff,markets,odds);
  const min=(x,keys,n)=>keys.every(k=>x.stats[k].n>=n)?Math.min(...keys.map(k=>x.stats[k].pct)):null;
- const key=id=>{const m=/^([A-Z]+?)(\\d+)p5$/.exec(id);return m?m[1].replace(/[GL]$/,''):'SPECIAL:'+id};
+ const key=id=>{const m=/^([A-Z]+?)(\d+)p5$/.exec(id);return m?m[1].replace(/[GL]$/,''):'SPECIAL:'+id};
  const ranked=compared.map(x=>{
   const long=min(x,['home','away'],minLong),recent=min(x,['home3','away3'],minRecent);
   const reliable=long!==null&&recent!==null;
