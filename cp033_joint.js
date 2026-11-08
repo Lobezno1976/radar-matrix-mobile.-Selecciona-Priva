@@ -78,7 +78,7 @@ function build(rows,markets,settle,cutoff,options={}){
   const ranked=[...unique.values()].sort(cmp);
   if(!ranked.length){if(depth<=2)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CHAIN',depth,stages,examined,audit};break;}
   const best=ranked[0];stages.push({depth,...best,indices:undefined});
-  if(depth>=2)allCoreCandidates.push(...ranked.map(x=>({...x,depth})));
+  if(depth>=2&&(options.compareCoreSizes!==false||depth===coreSize))allCoreCandidates.push(...ranked.map(x=>({...x,depth})));
   beam=ranked.slice(0,beamWidth);
  }
  // Compare complete CORE depths 2..4 instead of forcing one size.
@@ -96,6 +96,7 @@ function build(rows,markets,settle,cutoff,options={}){
  });
  // Verified prices determine economic ranking; otherwise compare observed frequencies only.
  coreOptions.sort((a,b)=>cmp(a,b));
+ if(!coreOptions.length)return {version:'CP033_V0_2',status:'NO_ADMISSIBLE_CORE_SIZE',requestedCoreSize:coreSize,stages,examined,audit};
  const core=coreOptions[0],sat=[];
  // SAT branches are independent extensions of the same frozen CORE.
  if(core&&satCount){
