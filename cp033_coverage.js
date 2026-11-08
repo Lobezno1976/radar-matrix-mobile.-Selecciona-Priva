@@ -40,5 +40,28 @@ function windows(rows,home,away,cutoff){
  homeCurrent:current.filter(r=>norm(r.HomeTeam)===norm(home)),awayCurrent:current.filter(r=>norm(r.AwayTeam)===norm(away))};
  return Object.fromEntries(Object.entries(subsets).map(([key,value])=>[key,summarize(value)]));
 }
-g.RadarCP033Coverage={eligible,filter,summarize,windows,excluded:EXCLUDED_PREFIXES};
+
+// Independent full-catalog audit. Does not apply the legacy eligibility filter.
+function auditAll(rows,markets,settle,cutoff,options={}){
+ const expectedCatalog=options.expectedCatalog??764,minSample=options.minSample??20;
+ if(!Array.isArray(rows)||!Array.isArray(markets)||typeof settle!=='function'||!Number.isInteger(minSample)||minSample<1)throw Error('Invalid coverage inputs');
+ const ids=new Set(),valid=rows.filter(r=>String(r.Date)<String(cutoff));
+ const items=markets.map(m=>{
+  if(!m||typeof m.id!=='string'||ids.has(m.id))throw Error('Missing or duplicate market ID');
+  ids.add(m.id);let n=0,hits=0,missingRows=0;
+  for(const r of valid){const v=settle(r,m.id);
+   if(v===null||v===undefined){missingRows++;continue;}
+   if(typeof v!=='boolean')throw Error('Invalid settlement for '+m.id);
+   n++;if(v)hits++;
+  }
+  const status=n===0?'PENDIENTE_FUENTE':n<minSample?'MUESTRA_INSUFICIENTE':'CALCULABLE';
+  return {id:m.id,status,n,hits,frequency:status==='CALCULABLE'?hits/n:null,missingRows};
+ });
+ const counts={CALCULABLE:0,MUESTRA_INSUFICIENTE:0,PENDIENTE_FUENTE:0};
+ for(const item of items)counts[item.status]++;
+ return {expectedCatalog,catalogCount:markets.length,catalogComplete:markets.length===expectedCatalog,
+  validHistoricalRows:valid.length,counts,coveragePct:markets.length?100*counts.CALCULABLE/markets.length:0,
+  fullCatalogCoveragePct:100*counts.CALCULABLE/expectedCatalog,items};
+}
+g.RadarCP033Coverage={eligible,filter,summarize,windows,auditAll,excluded:EXCLUDED_PREFIXES};
 })(typeof window!=='undefined'?window:globalThis);
