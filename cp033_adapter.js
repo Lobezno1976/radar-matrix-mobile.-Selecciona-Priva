@@ -6,7 +6,7 @@ function norm(s){
  'real betis balompie':'betis','real betis':'betis','malaga cf':'malaga','villarreal cf':'villarreal',
  'rcd espanyol de barcelona':'espanyol','rcd espanyol':'espanyol','elche cf':'elche','valencia cf':'valencia',
  'athletic club':'ath bilbao','athletic bilbao':'ath bilbao','real sociedad de futbol':'sociedad','real sociedad':'sociedad',
- 'levante ud':'levante','club atletico de madrid':'at madrid','atletico madrid':'at madrid',
+ 'levante ud':'levante','club atletico de madrid':'ath madrid','atletico madrid':'ath madrid','at madrid':'ath madrid','ath madrid':'ath madrid',
  'rc deportivo la coruna':'deportivo','deportivo la coruna':'deportivo','ca osasuna':'osasuna',
  'fc barcelona':'barcelona','deportivo alaves':'alaves','getafe cf':'getafe','sevilla fc':'sevilla',
  'real racing club de santander':'racing santander','racing santander':'racing santander',
